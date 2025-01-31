@@ -24,15 +24,15 @@ def break_into_files(
     current_content = []
     marker = "=" * 48
 
-    lines = content.split('\n')
+    lines = content.split("\n")
     i = 0
     while i < len(lines):
         line = lines[i]
 
         if line == marker:
             # Skip the "File:" line and the next marker
-            if i + 2 < len(lines) and lines[i + 1].startswith('File: '):
-                current_filepath = lines[i + 1].replace('File: ', '').strip()
+            if i + 2 < len(lines) and lines[i + 1].startswith("File: "):
+                current_filepath = lines[i + 1].replace("File: ", "").strip()
                 i += 3  # Skip both markers and the File: line
                 current_content = []
 
@@ -48,20 +48,18 @@ def break_into_files(
 
                     if include_extensions:
                         normalized_includes = [
-                            e if e.startswith('.') else f'.{e.lower()}'
-                            for e in include_extensions
+                            e if e.startswith(".") else f".{e.lower()}" for e in include_extensions
                         ]
                         should_include = ext in normalized_includes
 
                     if exclude_extensions and should_include:
                         normalized_excludes = [
-                            e if e.startswith('.') else f'.{e.lower()}'
-                            for e in exclude_extensions
+                            e if e.startswith(".") else f".{e.lower()}" for e in exclude_extensions
                         ]
                         should_include = ext not in normalized_excludes
 
                     if should_include:
-                        files.append((current_filepath, '\n'.join(current_content)))
+                        files.append((current_filepath, "\n".join(current_content)))
                 continue
         i += 1
 

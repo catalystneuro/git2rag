@@ -47,7 +47,7 @@ class RepoIndexer:
         self.qdrant = QdrantManager(
             url=qdrant_url,
             api_key=qdrant_api_key,
-            batch_size=100  # Default batch size for Qdrant operations
+            batch_size=100,  # Default batch size for Qdrant operations
         )
         self.collection_name = collection_name
 
@@ -59,10 +59,7 @@ class RepoIndexer:
         self.vector_size = 1536  # OpenAI models use 1536 dimensions
 
         # Ensure collection exists
-        self.qdrant.create_collection(
-            name=self.collection_name,
-            vector_size=self.vector_size
-        )
+        self.qdrant.create_collection(name=self.collection_name, vector_size=self.vector_size)
 
     def parse_repo(
         self,
@@ -90,7 +87,7 @@ class RepoIndexer:
             "summary": summary,
             "tree": tree,
             "content": files_content,
-            "chunks": []
+            "chunks": [],
         }
 
     def _estimate_tokens(self, text: str) -> int:
@@ -188,7 +185,7 @@ class RepoIndexer:
             model=model,
             custom_prompt=custom_prompt,
             max_tokens=max_tokens,
-            batch_size=batch_size
+            batch_size=batch_size,
         )
 
         # Update chunks with their summaries
@@ -201,7 +198,7 @@ class RepoIndexer:
         self,
         repo_url: str,
         embedding_from: str = "both",  # "raw", "processed", or "both"
-        batch_size: int = 100
+        batch_size: int = 100,
     ) -> None:
         """Generate embeddings for repository chunks.
 
@@ -218,10 +215,7 @@ class RepoIndexer:
             print("Generating raw content embeddings...")
             texts = [chunk.content_raw for chunk in repo_chunks]
             embeddings = generate_embeddings(
-                texts=texts,
-                model=self.embedding_model,
-                api_key=self.api_key,
-                batch_size=batch_size
+                texts=texts, model=self.embedding_model, api_key=self.api_key, batch_size=batch_size
             )
             for chunk, embedding in zip(repo_chunks, embeddings):
                 chunk.embedding_raw = embedding
@@ -235,13 +229,12 @@ class RepoIndexer:
                 print("No processed content found, skipping processed embeddings")
                 return
 
-            print(f"Generating processed content embeddings for {len(chunks_with_processed)} chunks...")
+            print(
+                f"Generating processed content embeddings for {len(chunks_with_processed)} chunks..."
+            )
             texts = [chunk.content_processed for chunk in chunks_with_processed]
             embeddings = generate_embeddings(
-                texts=texts,
-                model=self.embedding_model,
-                api_key=self.api_key,
-                batch_size=batch_size
+                texts=texts, model=self.embedding_model, api_key=self.api_key, batch_size=batch_size
             )
             for chunk, embedding in zip(chunks_with_processed, embeddings):
                 chunk.embedding_processed = embedding
@@ -265,26 +258,25 @@ class RepoIndexer:
                 vectors["processed"] = chunk.embedding_processed
 
             if vectors:  # Only add points that have at least one vector
-                points.append({
-                    "id": i,
-                    "vectors": vectors,
-                    "payload": {
-                        "content": chunk.content_raw,
-                        "content_processed": chunk.content_processed,
-                        "source_file": chunk.source_file,
-                        "start_line": chunk.start_line,
-                        "end_line": chunk.end_line,
-                        "chunk_type": chunk.chunk_type,
-                        "context": chunk.context,
-                        "repository": repo_url,
-                        "embedding_model": self.embedding_model
+                points.append(
+                    {
+                        "id": i,
+                        "vectors": vectors,
+                        "payload": {
+                            "content": chunk.content_raw,
+                            "content_processed": chunk.content_processed,
+                            "source_file": chunk.source_file,
+                            "start_line": chunk.start_line,
+                            "end_line": chunk.end_line,
+                            "chunk_type": chunk.chunk_type,
+                            "context": chunk.context,
+                            "repository": repo_url,
+                            "embedding_model": self.embedding_model,
+                        },
                     }
-                })
+                )
 
-        self.qdrant.insert_points(
-            collection_name=self.collection_name,
-            points=points
-        )
+        self.qdrant.insert_points(collection_name=self.collection_name, points=points)
         print(f"Stored {len(points)} chunks successfully")
 
     def index_repository(
@@ -398,10 +390,7 @@ class RepoIndexer:
         """
         # Get query embedding
         query_embedding = generate_embeddings(
-            texts=[query],
-            model=self.embedding_model,
-            api_key=self.api_key,
-            batch_size=batch_size
+            texts=[query], model=self.embedding_model, api_key=self.api_key, batch_size=batch_size
         )[0]
 
         # Build filter conditions
@@ -409,9 +398,7 @@ class RepoIndexer:
         if chunk_type:
             filter_conditions["chunk_type"] = chunk_type
         if file_extension:
-            filter_conditions["source_file"] = {
-                "path": f".*\\.{file_extension}$"
-            }
+            filter_conditions["source_file"] = {"path": f".*\\.{file_extension}$"}
 
         # Search using manager
         results = self.qdrant.search(
@@ -419,7 +406,7 @@ class RepoIndexer:
             query_vector=query_embedding,
             vector_name=vector_name,
             limit=limit,
-            filter_conditions=filter_conditions
+            filter_conditions=filter_conditions,
         )
 
         # Convert SearchResult objects to dicts for backward compatibility

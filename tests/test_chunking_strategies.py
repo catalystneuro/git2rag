@@ -17,9 +17,7 @@ if __name__ == "__main__":
     main()"""
 
     py_chunks = chunk_file_content(
-        file_content=py_content,
-        file_path="/src/main.py",
-        strategy=ChunkingStrategy.FILE
+        file_content=py_content, file_path="/src/main.py", strategy=ChunkingStrategy.FILE
     )
     assert len(py_chunks) == 1  # One chunk for the file
     assert py_chunks[0].chunk_type == "code"
@@ -36,9 +34,7 @@ This is a test README file.
 Some information about the project."""
 
     md_chunks = chunk_file_content(
-        file_content=md_content,
-        file_path="/README.md",
-        strategy=ChunkingStrategy.FILE
+        file_content=md_content, file_path="/README.md", strategy=ChunkingStrategy.FILE
     )
     assert len(md_chunks) == 1  # One chunk for the file
     assert md_chunks[0].chunk_type == "documentation"
@@ -64,9 +60,7 @@ if __name__ == "__main__":
     main()"""
 
     chunks = chunk_file_content(
-        file_content=content,
-        file_path="/src/main.py",
-        strategy=ChunkingStrategy.MARKER
+        file_content=content, file_path="/src/main.py", strategy=ChunkingStrategy.MARKER
     )
     assert len(chunks) > 1  # Should split into multiple chunks
 
@@ -102,9 +96,7 @@ Follow these steps to install:
 3. Import and use"""
 
     chunks = chunk_file_content(
-        file_content=content,
-        file_path="/README.md",
-        strategy=ChunkingStrategy.SEMANTIC
+        file_content=content, file_path="/README.md", strategy=ChunkingStrategy.SEMANTIC
     )
     assert len(chunks) > 1  # Should split into multiple chunks
 
@@ -127,14 +119,16 @@ def test_chunking_with_size_limits():
 def function_1():
     \"\"\"This is function 1.\"\"\"
     print("Function 1")
-""" + "\n".join(f"    print('Line {i}')" for i in range(100))
+""" + "\n".join(
+        f"    print('Line {i}')" for i in range(100)
+    )
 
     chunks = chunk_file_content(
         file_content=content,
         file_path="/src/long.py",
         strategy=ChunkingStrategy.MARKER,
         chunk_size=200,  # Small chunk size to force splitting
-        max_tokens=50    # Small token limit to force splitting
+        max_tokens=50,  # Small token limit to force splitting
     )
     assert len(chunks) > 1  # Should split into multiple chunks
     assert all(len(c.content) <= 400 for c in chunks)  # Check size limits
@@ -150,7 +144,7 @@ def test_filter_chunks():
     chunks = [
         *chunk_file_content(py_content, "/src/test.py"),
         *chunk_file_content(md_content, "/docs/test.md"),
-        *chunk_file_content(js_content, "/src/test.js")
+        *chunk_file_content(js_content, "/src/test.js"),
     ]
 
     # Test file type filtering
@@ -163,11 +157,6 @@ def test_filter_chunks():
     assert len(small_chunks) < len(chunks)
 
     # Test combined filtering
-    filtered = filter_chunks(
-        chunks,
-        min_tokens=2,
-        max_tokens=10,
-        file_types=[".py", ".js"]
-    )
+    filtered = filter_chunks(chunks, min_tokens=2, max_tokens=10, file_types=[".py", ".js"])
     assert all(c.source_file.endswith((".py", ".js")) for c in filtered)
     assert all(2 <= len(c.content.split()) <= 10 for c in filtered)

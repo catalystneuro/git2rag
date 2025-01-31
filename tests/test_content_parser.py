@@ -52,9 +52,7 @@ Interfaces
 
     # Test with both filters
     files = break_into_files(
-        content,
-        include_extensions=[".md", ".rst"],
-        exclude_extensions=[".rst"]
+        content, include_extensions=[".md", ".rst"], exclude_extensions=[".rst"]
     )
     assert len(files) == 1
     assert files[0].startswith("/README.md\n")

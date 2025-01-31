@@ -31,10 +31,7 @@ def search_collection(
     """
     # Generate query embedding
     query_embedding = generate_embeddings(
-        texts=[query],
-        model=model,
-        api_key=api_key,
-        batch_size=1
+        texts=[query], model=model, api_key=api_key, batch_size=1
     )[0]
 
     # Search using each vector type and collect all results

@@ -12,15 +12,14 @@ from qdrant_client.models import PointStruct
 @pytest.fixture
 def qdrant_manager():
     """Create a QdrantManager instance for testing."""
-    return QdrantManager(
-        url="http://localhost:6333",
-        batch_size=50
-    )
+    return QdrantManager(url="http://localhost:6333", batch_size=50)
+
 
 @pytest.fixture
 def mock_qdrant_client():
     """Create a mock Qdrant client."""
     return MagicMock()
+
 
 @pytest.fixture
 def sample_points():
@@ -35,8 +34,8 @@ def sample_points():
                 "chunk_type": "code",
                 "start_line": 1,
                 "end_line": 5,
-                "context": "class Test"
-            }
+                "context": "class Test",
+            },
         ),
         PointStruct(
             id=2,
@@ -47,22 +46,20 @@ def sample_points():
                 "chunk_type": "documentation",
                 "start_line": 1,
                 "end_line": 3,
-                "context": "# Section"
-            }
-        )
+                "context": "# Section",
+            },
+        ),
     ]
+
 
 def test_create_collection(qdrant_manager, mock_qdrant_client):
     """Test collection creation."""
-    with patch.object(qdrant_manager, 'client', mock_qdrant_client):
+    with patch.object(qdrant_manager, "client", mock_qdrant_client):
         # Mock existing collections
         mock_qdrant_client.get_collections.return_value.collections = []
 
         # Test creating new collection
-        result = qdrant_manager.create_collection(
-            name="test_collection",
-            vector_size=384
-        )
+        result = qdrant_manager.create_collection(name="test_collection", vector_size=384)
         assert result is True
         mock_qdrant_client.create_collection.assert_called_once()
 
@@ -70,28 +67,23 @@ def test_create_collection(qdrant_manager, mock_qdrant_client):
         mock_qdrant_client.get_collections.return_value.collections = [
             MagicMock(name="test_collection")
         ]
-        result = qdrant_manager.create_collection(
-            name="test_collection",
-            vector_size=384
-        )
+        result = qdrant_manager.create_collection(name="test_collection", vector_size=384)
         assert result is False
+
 
 def test_insert_points(qdrant_manager, mock_qdrant_client, sample_points):
     """Test point insertion with batching."""
-    with patch.object(qdrant_manager, 'client', mock_qdrant_client):
-        qdrant_manager.insert_points(
-            collection_name="test_collection",
-            points=sample_points
-        )
+    with patch.object(qdrant_manager, "client", mock_qdrant_client):
+        qdrant_manager.insert_points(collection_name="test_collection", points=sample_points)
 
         mock_qdrant_client.upsert.assert_called_once_with(
-            collection_name="test_collection",
-            points=sample_points
+            collection_name="test_collection", points=sample_points
         )
+
 
 def test_search(qdrant_manager, mock_qdrant_client, sample_points):
     """Test vector search functionality."""
-    with patch.object(qdrant_manager, 'client', mock_qdrant_client):
+    with patch.object(qdrant_manager, "client", mock_qdrant_client):
         # Mock search results
         mock_result = MagicMock()
         mock_result.score = 0.95
@@ -100,9 +92,7 @@ def test_search(qdrant_manager, mock_qdrant_client, sample_points):
 
         # Perform search
         results = qdrant_manager.search(
-            collection_name="test_collection",
-            query_vector=[0.1, 0.2, 0.3],
-            limit=1
+            collection_name="test_collection", query_vector=[0.1, 0.2, 0.3], limit=1
         )
 
         assert len(results) == 1
@@ -111,16 +101,14 @@ def test_search(qdrant_manager, mock_qdrant_client, sample_points):
         assert results[0].content == "Test content 1"
         assert results[0].type == "code"
 
+
 def test_search_with_filters(qdrant_manager, mock_qdrant_client):
     """Test search with filtering conditions."""
-    with patch.object(qdrant_manager, 'client', mock_qdrant_client):
+    with patch.object(qdrant_manager, "client", mock_qdrant_client):
         qdrant_manager.search(
             collection_name="test_collection",
             query_vector=[0.1, 0.2, 0.3],
-            filter_conditions={
-                "chunk_type": "code",
-                "source_file": {"path": ".*\\.py$"}
-            }
+            filter_conditions={"chunk_type": "code", "source_file": {"path": ".*\\.py$"}},
         )
 
         # Verify that search was called with correct filters
@@ -129,57 +117,51 @@ def test_search_with_filters(qdrant_manager, mock_qdrant_client):
         assert "query_filter" in call_kwargs
         assert call_kwargs["collection_name"] == "test_collection"
 
+
 def test_count_points(qdrant_manager, mock_qdrant_client):
     """Test point counting functionality."""
-    with patch.object(qdrant_manager, 'client', mock_qdrant_client):
+    with patch.object(qdrant_manager, "client", mock_qdrant_client):
         mock_qdrant_client.count.return_value.count = 42
 
         count = qdrant_manager.count_points(
-            collection_name="test_collection",
-            filter_conditions={"chunk_type": "code"}
+            collection_name="test_collection", filter_conditions={"chunk_type": "code"}
         )
 
         assert count == 42
         mock_qdrant_client.count.assert_called_once()
 
+
 def test_scroll_points(qdrant_manager, mock_qdrant_client, sample_points):
     """Test point scrolling functionality."""
-    with patch.object(qdrant_manager, 'client', mock_qdrant_client):
+    with patch.object(qdrant_manager, "client", mock_qdrant_client):
         mock_qdrant_client.scroll.return_value = (sample_points, "next_offset")
 
-        points, offset = qdrant_manager.scroll_points(
-            collection_name="test_collection",
-            limit=2
-        )
+        points, offset = qdrant_manager.scroll_points(collection_name="test_collection", limit=2)
 
         assert len(points) == 2
         assert offset == "next_offset"
         mock_qdrant_client.scroll.assert_called_once()
 
+
 def test_update_vectors(qdrant_manager, mock_qdrant_client):
     """Test vector updating functionality."""
-    with patch.object(qdrant_manager, 'client', mock_qdrant_client):
+    with patch.object(qdrant_manager, "client", mock_qdrant_client):
         points = [(1, [0.1, 0.2, 0.3]), (2, [0.4, 0.5, 0.6])]
 
-        qdrant_manager.update_vectors(
-            collection_name="test_collection",
-            points=points
-        )
+        qdrant_manager.update_vectors(collection_name="test_collection", points=points)
 
         mock_qdrant_client.update_vectors.assert_called_once_with(
-            collection_name="test_collection",
-            points=points
+            collection_name="test_collection", points=points
         )
+
 
 def test_list_collections(qdrant_manager, mock_qdrant_client):
     """Test listing collections."""
-    with patch.object(qdrant_manager, 'client', mock_qdrant_client):
+    with patch.object(qdrant_manager, "client", mock_qdrant_client):
         # Mock collections list
         collection1 = MagicMock(name="collection1")
         collection2 = MagicMock(name="collection2")
-        mock_qdrant_client.get_collections.return_value.collections = [
-            collection1, collection2
-        ]
+        mock_qdrant_client.get_collections.return_value.collections = [collection1, collection2]
 
         # Mock collection info
         def get_collection_mock(name):
@@ -214,9 +196,10 @@ def test_list_collections(qdrant_manager, mock_qdrant_client):
         collections = qdrant_manager.list_collections()
         assert len(collections) == 0
 
+
 def test_get_collection_info(qdrant_manager, mock_qdrant_client):
     """Test collection info retrieval."""
-    with patch.object(qdrant_manager, 'client', mock_qdrant_client):
+    with patch.object(qdrant_manager, "client", mock_qdrant_client):
         # Mock successful retrieval
         mock_info = MagicMock()
         mock_info.name = "test_collection"

@@ -43,22 +43,19 @@ def summarize_content(
         Exception: If the API call fails
     """
     # Prepare prompt with max_tokens
-    prompt = custom_prompt if custom_prompt else DEFAULT_SUMMARIZER_PROMPT.format(max_tokens=max_tokens)
+    prompt = (
+        custom_prompt if custom_prompt else DEFAULT_SUMMARIZER_PROMPT.format(max_tokens=max_tokens)
+    )
 
     # Prepare messages for batch processing
-    messages_list = [
-        [{
-            "role": "user",
-            "content": f"{prompt}\n\n{text}"
-        }] for text in text_content
-    ]
+    messages_list = [[{"role": "user", "content": f"{prompt}\n\n{text}"}] for text in text_content]
 
     try:
         # Process in batches
         summaries = []
         total_chunks = len(messages_list)
         for i in range(0, total_chunks, batch_size):
-            batch = messages_list[i:i + batch_size]
+            batch = messages_list[i : i + batch_size]
             responses = batch_completion(
                 model=model,
                 messages=batch,

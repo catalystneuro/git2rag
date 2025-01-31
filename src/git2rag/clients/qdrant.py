@@ -12,6 +12,7 @@ from qdrant_client.models import PointStruct, Filter
 @dataclass
 class SearchResult:
     """Search result from Qdrant."""
+
     id: Union[str, int]
     score: float
     content: str
@@ -28,11 +29,7 @@ class QdrantManager:
     """Manager for Qdrant operations."""
 
     def __init__(
-        self,
-        url: str,
-        api_key: Optional[str] = None,
-        timeout: float = 60.0,
-        batch_size: int = 100
+        self, url: str, api_key: Optional[str] = None, timeout: float = 60.0, batch_size: int = 100
     ):
         """Initialize Qdrant manager.
 
@@ -42,11 +39,7 @@ class QdrantManager:
             timeout: Request timeout in seconds
             batch_size: Default batch size for operations
         """
-        self.client = QdrantClient(
-            url=url,
-            api_key=api_key,
-            timeout=timeout
-        )
+        self.client = QdrantClient(url=url, api_key=api_key, timeout=timeout)
         self.batch_size = batch_size
 
     def create_collection(
@@ -54,7 +47,7 @@ class QdrantManager:
         name: str,
         vector_size: int,
         distance: Distance = Distance.COSINE,
-        on_disk_payload: bool = True
+        on_disk_payload: bool = True,
     ) -> bool:
         """Create a new collection if it doesn't exist.
 
@@ -75,9 +68,9 @@ class QdrantManager:
             collection_name=name,
             vectors_config={
                 "raw": VectorParams(size=vector_size, distance=distance),
-                "processed": VectorParams(size=vector_size, distance=distance)
+                "processed": VectorParams(size=vector_size, distance=distance),
             },
-            on_disk_payload=on_disk_payload
+            on_disk_payload=on_disk_payload,
         )
         return True
 
@@ -100,7 +93,7 @@ class QdrantManager:
         self,
         collection_name: str,
         points: List[dict],  # Each point must have id, payload, and vectors
-        batch_size: Optional[int] = None
+        batch_size: Optional[int] = None,
     ) -> None:
         """Insert points into collection.
 
@@ -122,42 +115,29 @@ class QdrantManager:
 
         for i in range(0, total_points, batch_size):
             batch = []
-            for point in points[i:i + batch_size]:
+            for point in points[i : i + batch_size]:
                 # Create point with named vectors
-                point_data = {
-                    "id": point['id'],
-                    "payload": point['payload']
-                }
+                point_data = {"id": point["id"], "payload": point["payload"]}
                 # Add vectors if they exist
                 vectors_dict = {}
-                if 'raw' in point['vectors']:
-                    vectors_dict["raw"] = point['vectors']['raw']
-                if 'processed' in point['vectors']:
-                    vectors_dict["processed"] = point['vectors']['processed']
+                if "raw" in point["vectors"]:
+                    vectors_dict["raw"] = point["vectors"]["raw"]
+                if "processed" in point["vectors"]:
+                    vectors_dict["processed"] = point["vectors"]["processed"]
                 point_data["vector"] = vectors_dict
 
                 batch.append(point_data)
 
-            self.client.upsert(
-                collection_name=collection_name,
-                points=batch
-            )
+            self.client.upsert(collection_name=collection_name, points=batch)
 
-    def delete_points(
-        self,
-        collection_name: str,
-        point_ids: List[Union[str, int]]
-    ) -> None:
+    def delete_points(self, collection_name: str, point_ids: List[Union[str, int]]) -> None:
         """Delete points from collection.
 
         Args:
             collection_name: Collection name
             point_ids: IDs of points to delete
         """
-        self.client.delete(
-            collection_name=collection_name,
-            points_selector=point_ids
-        )
+        self.client.delete(collection_name=collection_name, points_selector=point_ids)
 
     def search(
         self,
@@ -168,7 +148,7 @@ class QdrantManager:
         offset: int = 0,
         filter_conditions: Optional[Dict[str, Any]] = None,
         with_payload: bool = True,
-        score_threshold: Optional[float] = None
+        score_threshold: Optional[float] = None,
     ) -> List[SearchResult]:
         """Search for similar vectors.
 
@@ -192,18 +172,12 @@ class QdrantManager:
                 if isinstance(value, dict) and "path" in value:
                     # Handle regex path matching
                     must_conditions.append(
-                        models.FieldCondition(
-                            key=key,
-                            match=models.MatchText(text=value["path"])
-                        )
+                        models.FieldCondition(key=key, match=models.MatchText(text=value["path"]))
                     )
                 else:
                     # Handle exact value matching
                     must_conditions.append(
-                        models.FieldCondition(
-                            key=key,
-                            match=models.MatchValue(value=value)
-                        )
+                        models.FieldCondition(key=key, match=models.MatchValue(value=value))
                     )
             search_filter = models.Filter(must=must_conditions)
 
@@ -217,7 +191,7 @@ class QdrantManager:
             query_filter=search_filter,
             with_payload=with_payload,
             with_vectors=False,
-            score_threshold=score_threshold
+            score_threshold=score_threshold,
         )
 
         # Convert to SearchResult objects
@@ -234,9 +208,7 @@ class QdrantManager:
         ]
 
     def count_points(
-        self,
-        collection_name: str,
-        filter_conditions: Optional[Dict[str, Any]] = None
+        self, collection_name: str, filter_conditions: Optional[Dict[str, Any]] = None
     ) -> int:
         """Count points in collection.
 
@@ -253,17 +225,11 @@ class QdrantManager:
             must_conditions = []
             for key, value in filter_conditions.items():
                 must_conditions.append(
-                    models.FieldCondition(
-                        key=key,
-                        match=models.MatchValue(value=value)
-                    )
+                    models.FieldCondition(key=key, match=models.MatchValue(value=value))
                 )
             count_filter = models.Filter(must=must_conditions)
 
-        return self.client.count(
-            collection_name=collection_name,
-            count_filter=count_filter
-        ).count
+        return self.client.count(collection_name=collection_name, count_filter=count_filter).count
 
     def scroll_points(
         self,
@@ -272,7 +238,7 @@ class QdrantManager:
         offset: Optional[Union[str, int]] = None,
         filter_conditions: Optional[Dict[str, Any]] = None,
         with_payload: bool = True,
-        with_vectors: bool = False
+        with_vectors: bool = False,
     ) -> tuple[List[PointStruct], Optional[str]]:
         """Scroll through points in collection.
 
@@ -293,10 +259,7 @@ class QdrantManager:
             must_conditions = []
             for key, value in filter_conditions.items():
                 must_conditions.append(
-                    models.FieldCondition(
-                        key=key,
-                        match=models.MatchValue(value=value)
-                    )
+                    models.FieldCondition(key=key, match=models.MatchValue(value=value))
                 )
             scroll_filter = models.Filter(must=must_conditions)
 
@@ -306,13 +269,11 @@ class QdrantManager:
             offset=offset,
             scroll_filter=scroll_filter,
             with_payload=with_payload,
-            with_vectors=with_vectors
+            with_vectors=with_vectors,
         )
 
     def update_vectors(
-        self,
-        collection_name: str,
-        points: List[tuple[Union[str, int], List[float]]]
+        self, collection_name: str, points: List[tuple[Union[str, int], List[float]]]
     ) -> None:
         """Update vectors for existing points.
 
@@ -320,10 +281,7 @@ class QdrantManager:
             collection_name: Collection name
             points: List of (point_id, new_vector) tuples
         """
-        self.client.update_vectors(
-            collection_name=collection_name,
-            points=points
-        )
+        self.client.update_vectors(collection_name=collection_name, points=points)
 
     def list_collections(self) -> List[Dict[str, Any]]:
         """List all collections and their information.
@@ -337,13 +295,15 @@ class QdrantManager:
         for collection in collections:
             try:
                 info = self.client.get_collection(collection.name)
-                result.append({
-                    "name": info.name,
-                    "vector_size": info.config.params.vectors.size,
-                    "distance": info.config.params.vectors.distance,
-                    "status": info.status,
-                    "vectors_count": info.vectors_count
-                })
+                result.append(
+                    {
+                        "name": info.name,
+                        "vector_size": info.config.params.vectors.size,
+                        "distance": info.config.params.vectors.distance,
+                        "status": info.status,
+                        "vectors_count": info.vectors_count,
+                    }
+                )
             except Exception:
                 # Skip collections that can't be accessed
                 continue
@@ -366,7 +326,7 @@ class QdrantManager:
                 "vector_size": info.config.params.vectors.size,
                 "distance": info.config.params.vectors.distance,
                 "status": info.status,
-                "vectors_count": info.vectors_count
+                "vectors_count": info.vectors_count,
             }
         except Exception:
             return None
