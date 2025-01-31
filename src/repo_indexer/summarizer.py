@@ -5,7 +5,7 @@ from typing import Optional, List, Union
 from litellm import completion, batch_completion
 
 # Default prompt optimized for semantic embeddings
-DEFAULT_SUMMARIZER_PROMPT = """Analyze and summarize the following text with a focus on semantic meaning and key concepts. Your summary should:
+DEFAULT_SUMMARIZER_PROMPT = """Analyze and summarize the following text with a focus on semantic meaning and key concepts. Your summary must:
 
 1. Preserve the core concepts, technical terms, and domain-specific vocabulary
 2. Maintain important relationships between concepts
@@ -13,6 +13,7 @@ DEFAULT_SUMMARIZER_PROMPT = """Analyze and summarize the following text with a f
 4. Retain critical context that affects meaning
 5. Exclude redundant examples or repetitive phrasings
 6. Focus on factual content over stylistic elements
+7. Not exceed {max_tokens} tokens in length
 
 Aim for a concise summary that would enable accurate semantic embeddings while preserving the essential meaning and relationships in the text.
 
@@ -41,8 +42,8 @@ def summarize_content(
     Raises:
         Exception: If the API call fails
     """
-    # Prepare prompt
-    prompt = custom_prompt if custom_prompt else DEFAULT_SUMMARIZER_PROMPT
+    # Prepare prompt with max_tokens
+    prompt = custom_prompt if custom_prompt else DEFAULT_SUMMARIZER_PROMPT.format(max_tokens=max_tokens)
 
     # Prepare messages for batch processing
     messages_list = [
@@ -61,7 +62,6 @@ def summarize_content(
             responses = batch_completion(
                 model=model,
                 messages=batch,
-                max_tokens=max_tokens,
             )
             summaries.extend([r.choices[0].message.content.strip() for r in responses])
             print(f"Summarized chunks {i + len(batch)}/{total_chunks}")
