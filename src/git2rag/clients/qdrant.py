@@ -67,15 +67,12 @@ class QdrantManager:
         if any(c.name == name for c in collections):
             return False
 
-        # Configure vectors for both raw and processed content
-        vectors_config = {
-            "raw": VectorParams(size=vector_size, distance=distance),
-            "processed": VectorParams(size=vector_size, distance=distance)
-        }
-
         self.client.create_collection(
             collection_name=name,
-            vectors_config=vectors_config,
+            vectors_config={
+                "raw": VectorParams(size=vector_size, distance=distance),
+                "processed": VectorParams(size=vector_size, distance=distance)
+            },
             on_disk_payload=on_disk_payload
         )
         return True
@@ -120,7 +117,23 @@ class QdrantManager:
         total_points = len(points)
 
         for i in range(0, total_points, batch_size):
-            batch = points[i:i + batch_size]
+            batch = []
+            for point in points[i:i + batch_size]:
+                # Create point with named vectors
+                point_data = {
+                    "id": point['id'],
+                    "payload": point['payload']
+                }
+                # Add vectors if they exist
+                vectors_dict = {}
+                if 'raw' in point['vectors']:
+                    vectors_dict["raw"] = point['vectors']['raw']
+                if 'processed' in point['vectors']:
+                    vectors_dict["processed"] = point['vectors']['processed']
+                point_data["vector"] = vectors_dict
+
+                batch.append(point_data)
+
             self.client.upsert(
                 collection_name=collection_name,
                 points=batch
@@ -193,7 +206,8 @@ class QdrantManager:
         # Perform search
         results = self.client.search(
             collection_name=collection_name,
-            query_vector={vector_name: query_vector},
+            query_vector=query_vector if vector_name == "raw" else None,
+            query_vector_processed=query_vector if vector_name == "processed" else None,
             limit=limit,
             offset=offset,
             query_filter=search_filter,

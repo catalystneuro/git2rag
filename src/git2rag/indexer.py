@@ -163,7 +163,7 @@ class RepoIndexer:
         repo_url: str,
         model: str = "openai/gpt-4o-mini",
         custom_prompt: Optional[str] = None,
-        max_tokens: int = 500,
+        max_tokens: int = 200,
         batch_size: int = 20,
     ) -> None:
         """Generate summaries for repository chunks.
