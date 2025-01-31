@@ -32,7 +32,8 @@ def generate_embeddings(
 
     embeddings = []
     # Process in batches
-    for i in range(0, len(texts), batch_size):
+    total_texts = len(texts)
+    for i in range(0, total_texts, batch_size):
         batch = texts[i:i + batch_size]
         response = embedding(
             model=model,
@@ -40,5 +41,6 @@ def generate_embeddings(
         )
         batch_embeddings = [data["embedding"] for data in response.data]
         embeddings.extend(batch_embeddings)
+        print(f"Generated embeddings for texts {i + len(batch)}/{total_texts}")
 
     return embeddings

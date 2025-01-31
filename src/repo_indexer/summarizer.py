@@ -21,10 +21,9 @@ Text to summarize:"""
 
 def summarize_content(
     text_content: List[str],
-    model: str = "openai/gpt-4o",
-    api_key: Optional[str] = None,
+    model: str = "openai/gpt-4o-mini",
     custom_prompt: Optional[str] = None,
-    max_tokens: int = 500,
+    max_tokens: int = 200,
     batch_size: int = 20,
 ) -> List[str]:
     """Summarize text content optimized for semantic embeddings.
@@ -32,7 +31,6 @@ def summarize_content(
     Args:
         text_content: List of texts to summarize
         model: The model identifier (e.g., 'openai/gpt-4o', 'anthropic/claude-2')
-        api_key: Optional API key. If not provided, uses environment variables
         custom_prompt: Optional custom prompt to override the default
         max_tokens: Maximum tokens in the summary
         batch_size: Size of batches when processing multiple texts (default: 20)
@@ -43,11 +41,6 @@ def summarize_content(
     Raises:
         Exception: If the API call fails
     """
-    # Set API key if provided
-    if api_key:
-        provider = model.split("/")[0] if "/" in model else "openai"
-        os.environ[f"{provider.upper()}_API_KEY"] = api_key
-
     # Prepare prompt
     prompt = custom_prompt if custom_prompt else DEFAULT_SUMMARIZER_PROMPT
 
@@ -62,7 +55,8 @@ def summarize_content(
     try:
         # Process in batches
         summaries = []
-        for i in range(0, len(messages_list), batch_size):
+        total_chunks = len(messages_list)
+        for i in range(0, total_chunks, batch_size):
             batch = messages_list[i:i + batch_size]
             responses = batch_completion(
                 model=model,
@@ -70,6 +64,7 @@ def summarize_content(
                 max_tokens=max_tokens,
             )
             summaries.extend([r.choices[0].message.content.strip() for r in responses])
+            print(f"Summarized chunks {i + len(batch)}/{total_chunks}")
         return summaries
 
     except Exception as e:

@@ -161,7 +161,7 @@ class RepoIndexer:
     def summarize_chunks(
         self,
         repo_url: str,
-        model: str = "openai/gpt-4o",
+        model: str = "openai/gpt-4o-mini",
         custom_prompt: Optional[str] = None,
         max_tokens: int = 500,
         batch_size: int = 20,
@@ -214,13 +214,12 @@ class RepoIndexer:
         print(f"Generating embeddings for {len(repo_chunks)} chunks...")
 
         # Get content based on type
-        texts = [c.content_raw if content_type == "raw" else c.content_processed for c in repo_chunks]
+        texts = [c.content_raw for c in repo_chunks]
 
         # Generate embeddings using litellm
         embeddings = generate_embeddings(
             texts=texts,
             model=self.embedding_model,
-            api_key=self.api_key,
             batch_size=batch_size
         )
 
