@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "repo-indexer"
+name = "git2rag"
 version = "0.1.0"
 description = "Index GitHub repositories for RAG applications"
 readme = "README.md"
@@ -25,11 +25,11 @@ dependencies = ["gitingest", "numpy", "litellm>=1.0.0", "qdrant-client"]
 dev = ["black", "isort", "mypy", "pytest", "pytest-cov"]
 
 [project.scripts]
-repo-indexer = "repo_indexer.cli:main"
+git2rag = "git2rag.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["repo_indexer*"]
+include = ["git2rag*"]
 
 [tool.black]
 line-length = 100

@@ -67,12 +67,15 @@ class QdrantManager:
         if any(c.name == name for c in collections):
             return False
 
+        # Configure vectors for both raw and processed content
+        vectors_config = {
+            "raw": VectorParams(size=vector_size, distance=distance),
+            "processed": VectorParams(size=vector_size, distance=distance)
+        }
+
         self.client.create_collection(
             collection_name=name,
-            vectors_config=VectorParams(
-                size=vector_size,
-                distance=distance
-            ),
+            vectors_config=vectors_config,
             on_disk_payload=on_disk_payload
         )
         return True
@@ -95,14 +98,22 @@ class QdrantManager:
     def insert_points(
         self,
         collection_name: str,
-        points: List[PointStruct],
+        points: List[dict],  # Each point must have id, payload, and vectors
         batch_size: Optional[int] = None
     ) -> None:
         """Insert points into collection.
 
         Args:
             collection_name: Collection name
-            points: Points to insert
+            points: Points to insert, each with format:
+                   {
+                       'id': point_id,
+                       'payload': payload_dict,
+                       'vectors': {
+                           'raw': raw_vector,      # optional
+                           'processed': proc_vector # optional
+                       }
+                   }
             batch_size: Optional custom batch size
         """
         batch_size = batch_size or self.batch_size
@@ -135,6 +146,7 @@ class QdrantManager:
         self,
         collection_name: str,
         query_vector: List[float],
+        vector_name: str = "raw",  # "raw" or "processed"
         limit: int = 5,
         offset: int = 0,
         filter_conditions: Optional[Dict[str, Any]] = None,
@@ -181,7 +193,7 @@ class QdrantManager:
         # Perform search
         results = self.client.search(
             collection_name=collection_name,
-            query_vector=query_vector,
+            query_vector={vector_name: query_vector},
             limit=limit,
             offset=offset,
             query_filter=search_filter,

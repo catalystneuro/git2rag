@@ -24,8 +24,8 @@ class Chunk:
     end_line: Optional[int] = None
     chunk_type: str = "text"
     context: Optional[str] = None
-    embedding: Optional[List[float]] = None
-    embedding_from: Optional[str] = None  # Can be "content_raw" or "content_processed"
+    embedding_raw: Optional[List[float]] = None
+    embedding_processed: Optional[List[float]] = None
 
 
 def _estimate_tokens(text: str) -> int:
