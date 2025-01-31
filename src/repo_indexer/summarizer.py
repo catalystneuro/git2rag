@@ -1,8 +1,8 @@
 """Text summarization optimized for semantic embeddings."""
 
 import os
-from typing import Optional
-from litellm import completion
+from typing import Optional, List, Union
+from litellm import completion, batch_completion
 
 # Default prompt optimized for semantic embeddings
 DEFAULT_SUMMARIZER_PROMPT = """Analyze and summarize the following text with a focus on semantic meaning and key concepts. Your summary should:
@@ -20,25 +20,25 @@ Text to summarize:"""
 
 
 def summarize_content(
-    text_content: str,
+    text_content: List[str],
     model: str = "openai/gpt-4o",
     api_key: Optional[str] = None,
     custom_prompt: Optional[str] = None,
     max_tokens: int = 500,
-    temperature: float = 0.3,
-) -> str:
+    batch_size: int = 20,
+) -> List[str]:
     """Summarize text content optimized for semantic embeddings.
 
     Args:
-        text_content: The text to summarize
+        text_content: List of texts to summarize
         model: The model identifier (e.g., 'openai/gpt-4o', 'anthropic/claude-2')
         api_key: Optional API key. If not provided, uses environment variables
         custom_prompt: Optional custom prompt to override the default
         max_tokens: Maximum tokens in the summary
-        temperature: Temperature for generation (lower = more focused)
+        batch_size: Size of batches when processing multiple texts (default: 20)
 
     Returns:
-        Summarized text optimized for semantic embeddings
+        List of summarized texts
 
     Raises:
         Exception: If the API call fails
@@ -50,22 +50,27 @@ def summarize_content(
 
     # Prepare prompt
     prompt = custom_prompt if custom_prompt else DEFAULT_SUMMARIZER_PROMPT
-    messages = [{
-        "role": "user",
-        "content": f"{prompt}\n\n{text_content}"
-    }]
+
+    # Prepare messages for batch processing
+    messages_list = [
+        [{
+            "role": "user",
+            "content": f"{prompt}\n\n{text}"
+        }] for text in text_content
+    ]
 
     try:
-        # Make API call
-        response = completion(
-            model=model,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature
-        )
-
-        # Extract and return summary
-        return response.choices[0].message.content.strip()
+        # Process in batches
+        summaries = []
+        for i in range(0, len(messages_list), batch_size):
+            batch = messages_list[i:i + batch_size]
+            responses = batch_completion(
+                model=model,
+                messages=batch,
+                max_tokens=max_tokens,
+            )
+            summaries.extend([r.choices[0].message.content.strip() for r in responses])
+        return summaries
 
     except Exception as e:
-        raise Exception(f"Summarization failed: {str(e)}")
+        raise Exception(f"Batch summarization failed: {str(e)}")

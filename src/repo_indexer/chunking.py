@@ -50,13 +50,13 @@ def filter_chunks(
         Filtered list of chunks
     """
     # Filter out empty chunks
-    filtered = [chunk for chunk in chunks if chunk.content.strip()]
+    filtered = [chunk for chunk in chunks if chunk.content_raw.strip()]
 
     # Apply token count filters
     if min_tokens is not None or max_tokens is not None:
         result = []
         for chunk in filtered:
-            token_count = _estimate_tokens(chunk.content)
+            token_count = _estimate_tokens(chunk.content_raw)
             if min_tokens is not None and token_count < min_tokens:
                 continue
             if max_tokens is not None and token_count > max_tokens:
@@ -120,7 +120,7 @@ class BaseChunker:
     def _chunk_by_file(self, content: str, filepath: str) -> List[Chunk]:
         """Create a single chunk for the entire file."""
         return [Chunk(
-            content=content,
+            content_raw=content,
             source_file=filepath,
             start_line=0,
             end_line=len(content.split("\n")),

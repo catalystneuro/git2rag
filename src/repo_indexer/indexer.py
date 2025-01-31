@@ -16,12 +16,7 @@ from .chunking import (
 )
 from .content_parser import break_into_files
 from .clients import QdrantManager
-from .embeddings import (
-    LOCAL_E5_SMALL,
-    EmbeddingGenerator,
-    LiteLLMEmbeddings,
-    LocalE5Embeddings,
-)
+from .embeddings import generate_embeddings
 from .summarizer import summarize_content
 
 
@@ -34,9 +29,7 @@ class RepoIndexer:
         api_key: Optional[str] = None,
         qdrant_api_key: Optional[str] = None,
         collection_name: str = "repo_content",
-        embedding_generator: Optional[EmbeddingGenerator] = None,
-        embedding_model: str = LOCAL_E5_SMALL,  # Default to local E5 model
-        batch_size: int = 100,  # Batch size for operations
+        embedding_model: str = "text-embedding-ada-002",
     ):
         """Initialize the indexer.
 
@@ -45,11 +38,8 @@ class RepoIndexer:
             api_key: API key for the embedding provider
             qdrant_api_key: API key for Qdrant server
             collection_name: Name of the Qdrant collection
-            embedding_generator: Custom embedding generator (optional)
             embedding_model: Model identifier for embeddings
-            batch_size: Batch size for operations
         """
-
         # Store repository metadata
         self.repositories: Dict[str, Dict[str, Any]] = {}
 
@@ -57,25 +47,16 @@ class RepoIndexer:
         self.qdrant = QdrantManager(
             url=qdrant_url,
             api_key=qdrant_api_key,
-            batch_size=batch_size
+            batch_size=100  # Default batch size for Qdrant operations
         )
         self.collection_name = collection_name
 
-        # Initialize embedding generator
-        if embedding_generator:
-            self.embedding_generator = embedding_generator
-        elif embedding_model == LOCAL_E5_SMALL:
-            self.embedding_generator = LocalE5Embeddings()
-        else:
-            self.embedding_generator = LiteLLMEmbeddings(
-                model=embedding_model,
-                api_key=api_key
-            )
+        # Store configuration
+        self.embedding_model = embedding_model
+        self.api_key = api_key
 
-        # Get vector size from generator
-        self.vector_size = (
-            384 if embedding_model == LOCAL_E5_SMALL else 1536
-        )
+        # Set vector size based on model (OpenAI models)
+        self.vector_size = 1536  # OpenAI models use 1536 dimensions
 
         # Ensure collection exists
         self.qdrant.create_collection(
@@ -183,7 +164,7 @@ class RepoIndexer:
         model: str = "openai/gpt-4o",
         custom_prompt: Optional[str] = None,
         max_tokens: int = 500,
-        temperature: float = 0.3,
+        batch_size: int = 20,
     ) -> None:
         """Generate summaries for repository chunks.
 
@@ -193,34 +174,55 @@ class RepoIndexer:
             custom_prompt: Optional custom prompt for summarization
             max_tokens: Maximum tokens in each summary
             temperature: Temperature for generation
+            batch_size: Size of batches for processing chunks (default: 20)
         """
         repo_chunks = self.repositories[repo_url]["chunks"]
         print(f"Generating summaries for {len(repo_chunks)} chunks...")
 
-        for chunk in repo_chunks:
-            chunk.content_processed = summarize_content(
-                text_content=chunk.content_raw,
-                model=model,
-                custom_prompt=custom_prompt,
-                max_tokens=max_tokens,
-                temperature=temperature
-            )
+        # Get all raw content for batch processing
+        raw_contents = [chunk.content_raw for chunk in repo_chunks]
+
+        # Process all chunks in batches
+        summaries = summarize_content(
+            text_content=raw_contents,
+            model=model,
+            custom_prompt=custom_prompt,
+            max_tokens=max_tokens,
+            batch_size=batch_size
+        )
+
+        # Update chunks with their summaries
+        for chunk, summary in zip(repo_chunks, summaries):
+            chunk.content_processed = summary
 
         print("Summaries generated successfully")
 
-    def generate_embeddings(self, repo_url: str, content_type: str = "raw") -> None:
+    def generate_embeddings(
+        self,
+        repo_url: str,
+        content_type: str = "raw",
+        batch_size: int = 100
+    ) -> None:
         """Generate embeddings for repository chunks.
 
         Args:
             repo_url: URL or path of the repository
             content_type: Type of content to use for embeddings ("raw" or "processed")
+            batch_size: Size of batches for processing embeddings (default: 100)
         """
         repo_chunks = self.repositories[repo_url]["chunks"]
         print(f"Generating embeddings for {len(repo_chunks)} chunks...")
-        if content_type == "raw":
-            embeddings = self.embedding_generator.generate([c.content_raw for c in repo_chunks])
-        elif content_type == "processed":
-            embeddings = self.embedding_generator.generate([c.content_processed for c in repo_chunks])
+
+        # Get content based on type
+        texts = [c.content_raw if content_type == "raw" else c.content_processed for c in repo_chunks]
+
+        # Generate embeddings using litellm
+        embeddings = generate_embeddings(
+            texts=texts,
+            model=self.embedding_model,
+            api_key=self.api_key,
+            batch_size=batch_size
+        )
 
         # Store embeddings directly in chunks
         for chunk, embedding in zip(repo_chunks, embeddings):
@@ -249,11 +251,7 @@ class RepoIndexer:
                     "chunk_type": chunk.chunk_type,
                     "context": chunk.context,
                     "repository": repo_url,
-                    "embedding_model": (
-                        self.embedding_generator.model
-                        if isinstance(self.embedding_generator, LiteLLMEmbeddings)
-                        else LOCAL_E5_SMALL
-                    ),
+                    "embedding_model": self.embedding_model,
                 }
             )
             for i, chunk in enumerate(repo_chunks)
@@ -319,10 +317,16 @@ class RepoIndexer:
         limit: int = 5,
         chunk_type: Optional[str] = None,
         file_extension: Optional[str] = None,
+        batch_size: int = 100,
     ) -> List[dict]:
         """Search for relevant content."""
         # Get query embedding
-        query_embedding = self.embedding_generator.generate([query])[0]
+        query_embedding = generate_embeddings(
+            texts=[query],
+            model=self.embedding_model,
+            api_key=self.api_key,
+            batch_size=batch_size
+        )[0]
 
         # Build filter conditions
         filter_conditions = {}
