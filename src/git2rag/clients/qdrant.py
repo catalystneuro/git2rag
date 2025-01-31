@@ -1,6 +1,6 @@
 """Qdrant client operations for vector storage and retrieval."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import List, Optional, Dict, Any, Union, Tuple
 from pathlib import Path
 
@@ -18,7 +18,10 @@ class SearchResult:
     file: str
     type: str
     context: Optional[str]
-    lines: Tuple[Optional[int], Optional[int]]
+
+    def to_dict(self):
+        """Serialize the SearchResult instance to a dictionary."""
+        return asdict(self)
 
 
 class QdrantManager:
@@ -213,6 +216,7 @@ class QdrantManager:
             offset=offset,
             query_filter=search_filter,
             with_payload=with_payload,
+            with_vectors=False,
             score_threshold=score_threshold
         )
 
@@ -225,10 +229,6 @@ class QdrantManager:
                 file=result.payload["source_file"],
                 type=result.payload["chunk_type"],
                 context=result.payload.get("context"),
-                lines=(
-                    result.payload.get("start_line"),
-                    result.payload.get("end_line")
-                )
             )
             for result in results
         ]
