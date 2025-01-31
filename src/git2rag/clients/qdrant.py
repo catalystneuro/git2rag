@@ -5,13 +5,14 @@ from typing import List, Optional, Dict, Any, Union, Tuple
 from pathlib import Path
 
 from qdrant_client import QdrantClient, models
-from qdrant_client.http.models import Distance, VectorParams
+from qdrant_client.http.models import Distance, VectorParams, NamedVector
 from qdrant_client.models import PointStruct, Filter
 
 
 @dataclass
 class SearchResult:
     """Search result from Qdrant."""
+    id: Union[str, int]
     score: float
     content: str
     file: str
@@ -206,8 +207,8 @@ class QdrantManager:
         # Perform search
         results = self.client.search(
             collection_name=collection_name,
-            query_vector=query_vector if vector_name == "raw" else None,
-            query_vector_processed=query_vector if vector_name == "processed" else None,
+            query_vector=NamedVector(name=vector_name, vector=query_vector),
+            # query_vector_processed=query_vector if vector_name == "processed" else None,
             limit=limit,
             offset=offset,
             query_filter=search_filter,
@@ -218,6 +219,7 @@ class QdrantManager:
         # Convert to SearchResult objects
         return [
             SearchResult(
+                id=result.id,
                 score=result.score,
                 content=result.payload["content"],
                 file=result.payload["source_file"],
