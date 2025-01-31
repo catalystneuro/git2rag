@@ -25,6 +25,7 @@ class Chunk:
     chunk_type: str = "text"
     context: Optional[str] = None
     embedding: Optional[List[float]] = None
+    embedding_from: Optional[str] = None  # Can be "content_raw" or "content_processed"
 
 
 def _estimate_tokens(text: str) -> int:

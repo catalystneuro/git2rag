@@ -200,32 +200,80 @@ class RepoIndexer:
     def generate_embeddings(
         self,
         repo_url: str,
-        content_type: str = "raw",
+        embedding_from: str = "both",  # "raw", "processed", or "both"
         batch_size: int = 100
     ) -> None:
         """Generate embeddings for repository chunks.
 
         Args:
             repo_url: URL or path of the repository
-            content_type: Type of content to use for embeddings ("raw" or "processed")
+            embedding_from: Source for embeddings ("raw", "processed", or "both")
             batch_size: Size of batches for processing embeddings (default: 100)
         """
         repo_chunks = self.repositories[repo_url]["chunks"]
-        print(f"Generating embeddings for {len(repo_chunks)} chunks...")
 
-        # Get content based on type
-        texts = [c.content_raw for c in repo_chunks]
+        if embedding_from == "both":
+            # Create duplicates of chunks for both raw and processed embeddings
+            processed_chunks = []
+            for chunk in repo_chunks:
+                # Create a duplicate chunk for processed content
+                processed_chunk = Chunk(
+                    source_file=chunk.source_file,
+                    content_raw=chunk.content_raw,
+                    content_processed=chunk.content_processed,
+                    start_line=chunk.start_line,
+                    end_line=chunk.end_line,
+                    chunk_type=chunk.chunk_type,
+                    context=chunk.context
+                )
+                processed_chunks.append(processed_chunk)
 
-        # Generate embeddings using litellm
-        embeddings = generate_embeddings(
-            texts=texts,
-            model=self.embedding_model,
-            batch_size=batch_size
-        )
+            # Set embedding source and generate embeddings for raw content
+            print(f"Generating raw content embeddings for {len(repo_chunks)} chunks...")
+            texts = [chunk.content_raw for chunk in repo_chunks]
+            embeddings = generate_embeddings(
+                texts=texts,
+                model=self.embedding_model,
+                api_key=self.api_key,
+                batch_size=batch_size
+            )
+            for chunk, embedding in zip(repo_chunks, embeddings):
+                chunk.embedding = embedding
+                chunk.embedding_from = "content_raw"
 
-        # Store embeddings directly in chunks
-        for chunk, embedding in zip(repo_chunks, embeddings):
-            chunk.embedding = embedding
+            # Set embedding source and generate embeddings for processed content
+            print(f"Generating processed content embeddings for {len(processed_chunks)} chunks...")
+            texts = [chunk.content_processed for chunk in processed_chunks]
+            embeddings = generate_embeddings(
+                texts=texts,
+                model=self.embedding_model,
+                api_key=self.api_key,
+                batch_size=batch_size
+            )
+            for chunk, embedding in zip(processed_chunks, embeddings):
+                chunk.embedding = embedding
+                chunk.embedding_from = "content_processed"
+
+            # Combine both sets of chunks
+            self.repositories[repo_url]["chunks"] = repo_chunks + processed_chunks
+            print(f"Total chunks after combining: {len(self.repositories[repo_url]['chunks'])}")
+
+        else:
+            # Generate embeddings for either raw or processed content
+            print(f"Generating embeddings for {len(repo_chunks)} chunks...")
+            texts = [
+                chunk.content_raw if embedding_from == "raw" else chunk.content_processed
+                for chunk in repo_chunks
+            ]
+            embeddings = generate_embeddings(
+                texts=texts,
+                model=self.embedding_model,
+                api_key=self.api_key,
+                batch_size=batch_size
+            )
+            for chunk, embedding in zip(repo_chunks, embeddings):
+                chunk.embedding = embedding
+                chunk.embedding_from = f"content_{embedding_from}"
 
     def insert_chunks(self, repo_url: str) -> None:
         """Insert chunks and their embeddings into the vector database.
@@ -251,6 +299,7 @@ class RepoIndexer:
                     "context": chunk.context,
                     "repository": repo_url,
                     "embedding_model": self.embedding_model,
+                    "embedding_from": chunk.embedding_from,
                 }
             )
             for i, chunk in enumerate(repo_chunks)
@@ -316,9 +365,19 @@ class RepoIndexer:
         limit: int = 5,
         chunk_type: Optional[str] = None,
         file_extension: Optional[str] = None,
+        embedding_from: Optional[str] = None,  # "content_raw" or "content_processed"
         batch_size: int = 100,
     ) -> List[dict]:
-        """Search for relevant content."""
+        """Search for relevant content.
+
+        Args:
+            query: Search query
+            limit: Maximum number of results to return
+            chunk_type: Filter by chunk type (e.g., "code", "documentation")
+            file_extension: Filter by file extension
+            embedding_from: Filter by embedding source ("content_raw" or "content_processed")
+            batch_size: Batch size for embedding generation
+        """
         # Get query embedding
         query_embedding = generate_embeddings(
             texts=[query],
@@ -335,6 +394,8 @@ class RepoIndexer:
             filter_conditions["source_file"] = {
                 "path": f".*\\.{file_extension}$"
             }
+        if embedding_from:
+            filter_conditions["embedding_from"] = embedding_from
 
         # Search using manager
         results = self.qdrant.search(
