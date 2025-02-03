@@ -115,11 +115,12 @@ Return a JSON object with a key 'chunks' that maps to a list of strings, each re
 class ExtractionResult(BaseModel):
     chunks: List[str]
 
+
 def llm_chunking(
     content: str,
     file_type: str,
     model: str = "openai/o3-mini",
-    strip_source_code: bool = True
+    strip_source_code: bool = True,
 ) -> List[str]:
     """
     Uses an LLM to extract semantically optimal chunked segments from the content based on the file type.

@@ -11,14 +11,16 @@ from .llm_chunking import llm_chunking
 
 class ChunkingStrategy(Enum):
     """Available chunking strategies."""
-    FILE = auto()      # One chunk per file
-    MARKER = auto()    # Based on file type markers (classes, functions, sections)
+
+    FILE = auto()  # One chunk per file
+    MARKER = auto()  # Based on file type markers (classes, functions, sections)
     SEMANTIC = auto()  # LLM-assisted semantic chunking
 
 
 @dataclass
 class Chunk:
     """A chunk of content with metadata."""
+
     source_file: str
     content_raw: str
     content_processed: Optional[str] = None
@@ -89,10 +91,12 @@ class ChunkingConfig:
         overlap: Number of characters to overlap between chunks.
         max_tokens: Maximum number of tokens per chunk.
     """
+
     strategy: ChunkingStrategy = ChunkingStrategy.FILE
     chunk_size: int = 400
     overlap: int = 50
     max_tokens: int = 512
+    llm_model: str = "openai/o3-mini"
 
 
 class BaseChunker:
@@ -191,7 +195,12 @@ class BaseChunker:
     def _chunk_semantically(self, content: str, filepath: str) -> List[Chunk]:
         """LLM-assisted semantic chunking."""
         file_type = self._get_chunk_type(filepath)
-        return llm_chunking(content, file_type, self.config)
+        return llm_chunking(
+            content=content,
+            file_type=file_type,
+            model=self.config.llm_model,
+            strip_source_code=True,
+        )
 
     def _get_chunk_type(self, filepath: str) -> str:
         """Get chunk type based on file extension."""
@@ -353,7 +362,7 @@ class DocumentationChunker(BaseChunker):
                                 context=current_section,
                             )
                         )
-                        current_chunk_lines = chunk_text[pos + len(break_point):].split("\n")
+                        current_chunk_lines = chunk_text[pos + len(break_point) :].split("\n")
                         current_chunk_start = i - len(current_chunk_lines) + 1
                         break
 
@@ -390,6 +399,7 @@ def chunk_file_content(
     chunk_size: int = 400,
     overlap: int = 50,
     max_tokens: int = 512,
+    llm_model: str = "openai/o3-mini",
 ) -> List[Chunk]:
     """Process repository content and return chunks.
 
@@ -405,7 +415,11 @@ def chunk_file_content(
         List of content chunks.
     """
     config = ChunkingConfig(
-        strategy=strategy, chunk_size=chunk_size, overlap=overlap, max_tokens=max_tokens
+        strategy=strategy,
+        chunk_size=chunk_size,
+        overlap=overlap,
+        max_tokens=max_tokens,
+        llm_model=llm_model,
     )
     chunker = get_chunker(filepath=file_path, config=config)
     return chunker.chunk_content(content=file_content, filepath=file_path)
