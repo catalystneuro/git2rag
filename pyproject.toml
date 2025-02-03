@@ -19,7 +19,13 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = ["gitingest", "numpy", "litellm>=1.0.0", "qdrant-client"]
+dependencies = [
+    "gitingest",
+    "numpy",
+    "litellm>=1.0.0",
+    "qdrant-client",
+    "instructor[litellm]",
+]
 
 [project.optional-dependencies]
 dev = ["black", "isort", "mypy", "pytest", "pytest-cov"]

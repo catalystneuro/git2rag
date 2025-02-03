@@ -43,3 +43,4 @@ qdrant_storage/
 qdrant_storage/
 
 examples/*
+custom_tests/*
