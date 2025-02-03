@@ -195,12 +195,20 @@ class BaseChunker:
     def _chunk_semantically(self, content: str, filepath: str) -> List[Chunk]:
         """LLM-assisted semantic chunking."""
         file_type = self._get_chunk_type(filepath)
-        return llm_chunking(
+        text_chunks = llm_chunking(
             content=content,
             file_type=file_type,
             model=self.config.llm_model,
             strip_source_code=True,
         )
+        return [
+            Chunk(
+                content_raw=chunk_text,
+                source_file=filepath,
+                chunk_type=file_type,
+            )
+            for chunk_text in text_chunks
+        ]
 
     def _get_chunk_type(self, filepath: str) -> str:
         """Get chunk type based on file extension."""
@@ -210,7 +218,7 @@ class BaseChunker:
         elif ext in {".md", ".rst", ".txt", ".ipynb"}:
             return "documentation"
         else:
-            return "text"
+            return "documentation"
 
 
 class CodeChunker(BaseChunker):

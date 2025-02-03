@@ -146,7 +146,7 @@ def llm_chunking(
     messages = [
         {
             "role": "user",
-            "content": f"{PROMPT}\nContent:\n{content}",
+            "content": f"{prompt}\nContent:\n{content}",
         }
     ]
     client = instructor.from_litellm(completion)
