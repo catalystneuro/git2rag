@@ -64,23 +64,21 @@ class RepoIndexer:
     def parse_repo(
         self,
         repo_url: str,
-        include_extensions: Optional[List[str]] = None,
-        exclude_extensions: Optional[List[str]] = None,
+        include_patterns: Optional[List[str]] = None,
+        exclude_patterns: Optional[List[str]] = None,
     ) -> None:
         """Parse a repository and store its raw content.
 
         Args:
             repo_url: URL or path of the repository
-            include_extensions: List of file extensions to include (e.g. ['.py', '.md'])
-            exclude_extensions: List of file extensions to exclude
         """
         print(f"Parsing repository: {repo_url}")
-        summary, tree, full_content = ingest(repo_url)
-        files_content = break_into_files(
-            full_content,
-            include_extensions=include_extensions,
-            exclude_extensions=exclude_extensions,
+        summary, tree, full_content = ingest(
+            source=repo_url,
+            include_patterns=include_patterns,
+            exclude_patterns=exclude_patterns,
         )
+        files_content = break_into_files(full_content)
 
         # Store metadata
         self.repositories[repo_url] = {
@@ -129,9 +127,11 @@ class RepoIndexer:
             # If repo URL is not provided, use the first repository
             repo_url = next(iter(self.repositories.keys()))
 
-        print(f"Generating chunks using {strategy.name} strategy...")
+        n_files = len(self.repositories[repo_url]["content"])
+        print(f"Generating chunks for {n_files} files using {strategy.name} strategy.")
         all_chunks = []
         for content in self.repositories[repo_url]["content"]:
+            print(f"Chunking file: {content[0]}")
             file_chunks = chunk_file_content(
                 file_content=content[1],
                 file_path=content[0],
@@ -160,7 +160,7 @@ class RepoIndexer:
         repo_url: str,
         model: str = "openai/gpt-4o-mini",
         custom_prompt: Optional[str] = None,
-        max_tokens: int = 200,
+        max_tokens: int = 100,
         batch_size: int = 20,
     ) -> None:
         """Generate summaries for repository chunks.
@@ -281,19 +281,22 @@ class RepoIndexer:
 
     def index_repository(
         self,
+        # Parsing parameters
         repo_url: str,
+        include_patterns: Optional[List[str]] = None,
+        exclude_patterns: Optional[List[str]] = None,
         # Chunking parameters
         strategy: ChunkingStrategy = ChunkingStrategy.FILE,
         min_tokens: Optional[int] = None,
         max_tokens: Optional[int] = None,
         file_types: Optional[List[str]] = None,
-        chunk_size: int = 400,
-        overlap: int = 50,
+        chunk_size: Optional[int] = None,
+        overlap: Optional[int] = None,
         # Summarization parameters
         summarize: bool = True,
         summary_model: str = "openai/gpt-4o-mini",
         summary_prompt: Optional[str] = None,
-        summary_max_tokens: int = 500,
+        summary_max_tokens: int = 100,
         summary_batch_size: int = 20,
         # Embedding parameters
         embedding_from: str = "both",  # "raw", "processed", or "both"
@@ -330,7 +333,11 @@ class RepoIndexer:
         # Step 1: Parse repo
         print("\n1. Parsing repository...")
         if repo_url not in self.repositories:
-            self.parse_repo(repo_url)
+            self.parse_repo(
+                repo_url=repo_url,
+                include_patterns=include_patterns,
+                exclude_patterns=exclude_patterns,
+            )
 
         # Step 2: Generate chunks with filters
         print("\n2. Generating chunks...")

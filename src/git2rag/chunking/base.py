@@ -4,7 +4,9 @@ import re
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional
+
+from .llm_chunking import llm_chunking
 
 
 class ChunkingStrategy(Enum):
@@ -44,18 +46,18 @@ def filter_chunks(
     """Filter chunks based on token count and file types.
 
     Args:
-        chunks: List of chunks to filter
-        min_tokens: Minimum number of tokens per chunk
-        max_tokens: Maximum number of tokens per chunk
-        file_types: List of file extensions to include (e.g. ['.py', '.md'])
+        chunks: List of chunks to filter.
+        min_tokens: Minimum number of tokens per chunk.
+        max_tokens: Maximum number of tokens per chunk.
+        file_types: List of file extensions to include (e.g. ['.py', '.md']).
 
     Returns:
-        Filtered list of chunks
+        Filtered list of chunks.
     """
-    # Filter out empty chunks
+    # Filter out empty chunks.
     filtered = [chunk for chunk in chunks if chunk.content_raw.strip()]
 
-    # Apply token count filters
+    # Apply token count filters.
     if min_tokens is not None or max_tokens is not None:
         result = []
         for chunk in filtered:
@@ -67,9 +69,8 @@ def filter_chunks(
             result.append(chunk)
         filtered = result
 
-    # Apply file type filter
+    # Apply file type filter.
     if file_types:
-        # Normalize file types to lowercase with leading dot
         normalized_types = [t if t.startswith(".") else f".{t.lower()}" for t in file_types]
         filtered = [
             chunk
@@ -85,16 +86,17 @@ class ChunkingConfig:
     """Configuration for chunking strategies.
 
     Args:
-        strategy: Chunking strategy to use
-        chunk_size: Target size of each chunk in characters
-        overlap: Number of characters to overlap between chunks
-        max_tokens: Maximum number of tokens per chunk
+        strategy: Chunking strategy to use.
+        chunk_size: Target size of each chunk in characters.
+        overlap: Number of characters to overlap between chunks.
+        max_tokens: Maximum number of tokens per chunk.
     """
 
     strategy: ChunkingStrategy = ChunkingStrategy.FILE
     chunk_size: int = 400
     overlap: int = 50
     max_tokens: int = 512
+    llm_model: str = "openai/o3-mini"
 
 
 class BaseChunker:
@@ -104,7 +106,7 @@ class BaseChunker:
         """Initialize chunker with configuration.
 
         Args:
-            config: Chunking configuration
+            config: Chunking configuration.
         """
         self.config = config
 
@@ -146,32 +148,28 @@ class BaseChunker:
                 len(chunk_text) >= self.config.chunk_size
                 or _estimate_tokens(chunk_text) >= self.config.max_tokens * 0.8
             ):
-
-                # Try to find a good break point
                 break_points = ["\n\n", ". ", "\n", " "]
                 for break_point in break_points:
                     pos = chunk_text.rfind(break_point, 0, self.config.chunk_size)
                     if pos > self.config.chunk_size // 2:
                         break_text = chunk_text[: pos + len(break_point)]
                         remainder = chunk_text[pos + len(break_point) :]
-
                         chunks.append(
                             Chunk(
-                                content=break_text,
+                                content_raw=break_text,
                                 source_file=filepath,
                                 start_line=current_chunk_start,
                                 end_line=i,
                                 chunk_type=self._get_chunk_type(filepath),
                             )
                         )
-
                         current_chunk_lines = remainder.split("\n")
                         current_chunk_start = i - len(current_chunk_lines) + 1
                         break
                 else:
                     chunks.append(
                         Chunk(
-                            content=chunk_text[: self.config.chunk_size],
+                            content_raw=chunk_text[: self.config.chunk_size],
                             source_file=filepath,
                             start_line=current_chunk_start,
                             end_line=i,
@@ -184,7 +182,7 @@ class BaseChunker:
         if current_chunk_lines:
             chunks.append(
                 Chunk(
-                    content="\n".join(current_chunk_lines),
+                    content_raw="\n".join(current_chunk_lines),
                     source_file=filepath,
                     start_line=current_chunk_start,
                     end_line=len(lines),
@@ -195,19 +193,32 @@ class BaseChunker:
         return chunks
 
     def _chunk_semantically(self, content: str, filepath: str) -> List[Chunk]:
-        """Placeholder for LLM-assisted semantic chunking."""
-        # TODO: Implement semantic chunking with LLM assistance
-        return self._chunk_by_markers(content, filepath)
+        """LLM-assisted semantic chunking."""
+        file_type = self._get_chunk_type(filepath)
+        text_chunks = llm_chunking(
+            content=content,
+            file_type=file_type,
+            model=self.config.llm_model,
+            strip_source_code=True,
+        )
+        return [
+            Chunk(
+                content_raw=chunk_text,
+                source_file=filepath,
+                chunk_type=file_type,
+            )
+            for chunk_text in text_chunks
+        ]
 
     def _get_chunk_type(self, filepath: str) -> str:
         """Get chunk type based on file extension."""
         ext = Path(filepath).suffix.lower()
         if ext in {".py", ".js", ".java", ".cpp", ".h", ".hpp"}:
             return "code"
-        elif ext in {".md", ".rst", ".txt"}:
+        elif ext in {".md", ".rst", ".txt", ".ipynb"}:
             return "documentation"
         else:
-            return "text"
+            return "documentation"
 
 
 class CodeChunker(BaseChunker):
@@ -224,12 +235,11 @@ class CodeChunker(BaseChunker):
         current_context = None
 
         for i, line in enumerate(lines):
-            # Handle class definitions
             if re.match(r"^\s*class\s+", line):
-                if current_chunk_lines and not in_class:  # Only end chunk if not already in a class
+                if current_chunk_lines and not in_class:
                     chunks.append(
                         Chunk(
-                            content="\n".join(current_chunk_lines),
+                            content_raw="\n".join(current_chunk_lines),
                             source_file=filepath,
                             start_line=current_chunk_start,
                             end_line=i,
@@ -241,12 +251,11 @@ class CodeChunker(BaseChunker):
                 in_class = True
                 current_context = line.strip()
                 current_chunk_start = i
-            # Handle function definitions outside classes
             elif re.match(r"^\s*def\s+", line) and not in_class:
                 if current_chunk_lines:
                     chunks.append(
                         Chunk(
-                            content="\n".join(current_chunk_lines),
+                            content_raw="\n".join(current_chunk_lines),
                             source_file=filepath,
                             start_line=current_chunk_start,
                             end_line=i,
@@ -261,10 +270,9 @@ class CodeChunker(BaseChunker):
 
             current_chunk_lines.append(line)
             chunk_text = "\n".join(current_chunk_lines)
-
-            # Check if we should complete the current chunk
             chunk_complete = False
-            if not in_class:  # Only auto-split chunks outside classes
+
+            if not in_class:
                 if in_function and re.match(r"^\s*$", line):
                     in_function = False
                     chunk_complete = True
@@ -279,7 +287,6 @@ class CodeChunker(BaseChunker):
                 and i + 1 < len(lines)
                 and not lines[i + 1].startswith(" ")
             ):
-                # End class when we hit an empty line followed by non-indented line
                 in_class = False
                 in_function = False
                 chunk_complete = True
@@ -287,7 +294,7 @@ class CodeChunker(BaseChunker):
             if chunk_complete and current_chunk_lines:
                 chunks.append(
                     Chunk(
-                        content="\n".join(current_chunk_lines),
+                        content_raw="\n".join(current_chunk_lines),
                         source_file=filepath,
                         start_line=current_chunk_start,
                         end_line=i + 1,
@@ -301,7 +308,7 @@ class CodeChunker(BaseChunker):
         if current_chunk_lines:
             chunks.append(
                 Chunk(
-                    content="\n".join(current_chunk_lines),
+                    content_raw="\n".join(current_chunk_lines),
                     source_file=filepath,
                     start_line=current_chunk_start,
                     end_line=len(lines),
@@ -329,7 +336,7 @@ class DocumentationChunker(BaseChunker):
                 if current_chunk_lines:
                     chunks.append(
                         Chunk(
-                            content="\n".join(current_chunk_lines),
+                            content_raw="\n".join(current_chunk_lines),
                             source_file=filepath,
                             start_line=current_chunk_start,
                             end_line=i,
@@ -343,7 +350,6 @@ class DocumentationChunker(BaseChunker):
 
             current_chunk_lines.append(line)
             chunk_text = "\n".join(current_chunk_lines)
-
             if (
                 len(chunk_text) >= self.config.chunk_size
                 or _estimate_tokens(chunk_text) >= self.config.max_tokens * 0.8
@@ -353,11 +359,10 @@ class DocumentationChunker(BaseChunker):
                     pos = chunk_text.rfind(break_point, 0, self.config.chunk_size)
                     if pos > self.config.chunk_size // 2:
                         break_text = chunk_text[: pos + len(break_point)]
-                        remainder = chunk_text[pos + len(break_point) :]
-
+                        # remainder is not used in this simple implementation
                         chunks.append(
                             Chunk(
-                                content=break_text,
+                                content_raw=break_text,
                                 source_file=filepath,
                                 start_line=current_chunk_start,
                                 end_line=i,
@@ -365,15 +370,14 @@ class DocumentationChunker(BaseChunker):
                                 context=current_section,
                             )
                         )
-
-                        current_chunk_lines = remainder.split("\n")
+                        current_chunk_lines = chunk_text[pos + len(break_point) :].split("\n")
                         current_chunk_start = i - len(current_chunk_lines) + 1
                         break
 
         if current_chunk_lines:
             chunks.append(
                 Chunk(
-                    content="\n".join(current_chunk_lines),
+                    content_raw="\n".join(current_chunk_lines),
                     source_file=filepath,
                     start_line=current_chunk_start,
                     end_line=len(lines),
@@ -388,10 +392,9 @@ class DocumentationChunker(BaseChunker):
 def get_chunker(filepath: str, config: ChunkingConfig) -> BaseChunker:
     """Get appropriate chunker for a file type."""
     ext = Path(filepath).suffix.lower()
-
     if ext in {".py", ".js", ".java", ".cpp", ".h", ".hpp"}:
         return CodeChunker(config)
-    elif ext in {".md", ".rst", ".txt"}:
+    elif ext in {".md", ".rst", ".txt", ".ipynb"}:
         return DocumentationChunker(config)
     else:
         return BaseChunker(config)
@@ -404,30 +407,27 @@ def chunk_file_content(
     chunk_size: int = 400,
     overlap: int = 50,
     max_tokens: int = 512,
+    llm_model: str = "openai/o3-mini",
 ) -> List[Chunk]:
     """Process repository content and return chunks.
 
     Args:
-        file_content: Content of the file to chunk
-        file_path: Path to the file
-        strategy: Chunking strategy to use
-        chunk_size: Target size of each chunk in characters
-        overlap: Number of characters to overlap between chunks
-        max_tokens: Maximum number of tokens per chunk
+        file_content: Content of the file to chunk.
+        file_path: Path to the file.
+        strategy: Chunking strategy to use.
+        chunk_size: Target size of each chunk in characters.
+        overlap: Number of characters to overlap between chunks.
+        max_tokens: Maximum number of tokens per chunk.
 
     Returns:
-        List of content chunks
+        List of content chunks.
     """
     config = ChunkingConfig(
-        strategy=strategy, chunk_size=chunk_size, overlap=overlap, max_tokens=max_tokens
+        strategy=strategy,
+        chunk_size=chunk_size,
+        overlap=overlap,
+        max_tokens=max_tokens,
+        llm_model=llm_model,
     )
-
-    chunker = get_chunker(
-        filepath=file_path,
-        config=config,
-    )
-
-    return chunker.chunk_content(
-        content=file_content,
-        filepath=file_path,
-    )
+    chunker = get_chunker(filepath=file_path, config=config)
+    return chunker.chunk_content(content=file_content, filepath=file_path)

@@ -127,7 +127,7 @@ def function_1():
         file_content=content,
         file_path="/src/long.py",
         strategy=ChunkingStrategy.MARKER,
-        chunk_size=200,  # Small chunk size to force splitting
+        chunk_size=100,  # Small chunk size to force splitting
         max_tokens=50,  # Small token limit to force splitting
     )
     assert len(chunks) > 1  # Should split into multiple chunks

@@ -1,13 +1,15 @@
-# Repository Indexer for RAG
+# Git2RAG: Repository Indexer for RAG
 
 A tool for indexing GitHub repositories to make their content accessible through RAG (Retrieval-Augmented Generation) systems. This tool processes repository content, including documentation, source code, and configuration files, into semantically meaningful chunks that can be efficiently searched using vector similarity.
 
 ## Features
 
 - 📚 Smart content chunking
+  - Multiple chunking strategies (FILE, MARKER, SEMANTIC)
   - Context-aware splitting for different file types
   - Code chunks preserve class/function boundaries
   - Documentation chunks respect section structure
+  - LLM-assisted semantic chunking for optimal content breaks
   - Configurable chunk sizes and overlap
 
 - 🔍 Efficient vector search
@@ -18,15 +20,22 @@ A tool for indexing GitHub repositories to make their content accessible through
 
 - 🎯 Specialized handling for:
   - Python source code (preserves class/function context)
+  - JavaScript, Java, C++, and other code files
   - Markdown documentation (respects headers)
   - RST documentation
   - Configuration files (YAML, JSON, etc.)
 
+- 🤖 Content processing
+  - Optional chunk summarization using LLMs
+  - Raw and processed content embeddings
+  - Batch processing for efficiency
+  - Customizable filtering options
+
 ## Installation
 
-1. Install dependencies:
+1. Install the package:
 ```bash
-pip install repo-indexer
+pip install git2rag
 ```
 
 2. Start Qdrant:
@@ -36,7 +45,7 @@ docker-compose up -d
 
 3. Set up environment variables:
 ```bash
-# Required for your chosen embedding provider:
+# Required for your chosen embedding provider
 export OPENAI_API_KEY="your-api-key"      # For OpenAI
 export AZURE_API_KEY="your-api-key"       # For Azure
 export COHERE_API_KEY="your-api-key"      # For Cohere
@@ -53,106 +62,108 @@ export QDRANT_API_KEY="your-qdrant-api-key"  # If using authentication
 
 1. Index a repository:
 ```bash
-# Using OpenAI (default)
-repo-indexer index https://github.com/username/repo
+# Basic indexing
+git2rag index https://github.com/username/repo
 
-# Using Azure
-repo-indexer index https://github.com/username/repo \
-  --embedding-model azure/text-embedding-ada-002 \
-  --api-key your-azure-key
+# With semantic chunking
+git2rag index https://github.com/username/repo --strategy semantic
 
-# Using Cohere
-repo-indexer index https://github.com/username/repo \
-  --embedding-model cohere/embed-english-v3.0 \
-  --api-key your-cohere-key
+# With chunk summarization
+git2rag index https://github.com/username/repo --summarize
+
+# Customize chunking
+git2rag index https://github.com/username/repo \
+  --chunk-size 500 \
+  --overlap 50 \
+  --max-tokens 1000
 ```
 
 2. Search content:
 ```bash
 # Basic search
-repo-indexer search "How do I implement feature X?"
+git2rag search "How do I implement feature X?"
 
 # Filter by content type
-repo-indexer search "error handling" --type code
+git2rag search "error handling" --type code
 
 # Filter by file extension
-repo-indexer search "configuration options" --ext yaml
+git2rag search "configuration options" --ext yaml
 
-# Specify embedding model
-repo-indexer search "query" --embedding-model azure/text-embedding-ada-002
+# Search in processed content
+git2rag search "query" --vector-name processed
 ```
 
 ### Python API
 
 ```python
-from repo_indexer import RepoIndexer, AZURE_ADA, COHERE_EMBED
+from git2rag import RepoIndexer, ChunkingStrategy
 
-# Using OpenAI (default)
+# Initialize indexer
 indexer = RepoIndexer(
     qdrant_url="http://localhost:6333",
-    api_key="your-openai-key",
+    api_key="your-api-key",  # For your chosen embedding provider
+    embedding_model="text-embedding-ada-002",  # Or any model supported by LiteLLM
 )
 
-# Using Azure
-indexer = RepoIndexer(
-    qdrant_url="http://localhost:6333",
-    api_key="your-azure-key",
-    embedding_model=AZURE_ADA,
-)
-
-# Using Cohere
-indexer = RepoIndexer(
-    qdrant_url="http://localhost:6333",
-    api_key="your-cohere-key",
-    embedding_model=COHERE_EMBED,
-)
-
-# Index and search
+# Index with default settings
 indexer.index_repository("https://github.com/username/repo")
+
+# Index with semantic chunking and summarization
+indexer.index_repository(
+    repo_url="https://github.com/username/repo",
+    strategy=ChunkingStrategy.SEMANTIC,
+    summarize=True,
+    summary_model="openai/gpt-4o-mini",
+    embedding_from="both",  # Generate embeddings for both raw and processed content
+)
+
+# Search
 results = indexer.search(
     query="How do I implement feature X?",
     limit=5,
     chunk_type="code",  # Optional: Filter by content type
     file_extension="py",  # Optional: Filter by extension
+    vector_name="processed",  # Optional: Search in processed content
 )
-```
 
-### Custom Embedding Providers
-
-You can implement custom embedding providers by implementing the `EmbeddingGenerator` protocol:
-
-```python
-from repo_indexer import EmbeddingGenerator
-from typing import List
-
-class CustomEmbeddings(EmbeddingGenerator):
-    def generate(self, texts: List[str]) -> List[List[float]]:
-        # Your embedding logic here
-        return embeddings
-
-indexer = RepoIndexer(
-    qdrant_url="http://localhost:6333",
-    embedding_generator=CustomEmbeddings(),
-)
+# Access results
+for result in results:
+    print(f"Score: {result['score']}")
+    print(f"File: {result['file']}")
+    print(f"Lines: {result['lines']}")
+    print(f"Content: {result['content']}")
+    print(f"Context: {result['context']}")
 ```
 
 ## Development
 
 The project consists of several components:
 
-1. `chunking.py`: Smart content chunking strategies
-2. `embeddings.py`: Embedding generation with multiple providers
-3. `indexer.py`: Main indexing and search functionality
-4. `cli.py`: Command-line interface
+1. `chunking/`: Smart content chunking strategies
+   - `base.py`: Base chunking implementation and utilities
+   - `llm_chunking.py`: LLM-assisted semantic chunking
+
+2. `clients/`: Database client implementations
+   - `qdrant.py`: Qdrant vector database integration
+
+3. Core functionality:
+   - `indexer.py`: Main indexing and search functionality
+   - `embeddings.py`: Embedding generation through LiteLLM
+   - `content_parser.py`: Repository content parsing
+   - `summarizer.py`: Content summarization using LLMs
 
 ### Running Tests
 
 ```bash
 # Install development dependencies
-pip install repo-indexer[dev]
+pip install git2rag[dev]
 
 # Run tests
 pytest
+
+# Run specific test files
+pytest tests/test_chunking.py
+pytest tests/test_indexer.py
 ```
 
 ## Contributing
@@ -160,10 +171,11 @@ pytest
 Contributions are welcome! Some areas that could use improvement:
 
 - Additional chunking strategies for other file types
-- Support for more embedding providers
+- Support for more embedding providers through LiteLLM
 - Improved context preservation
 - Batch processing for large repositories
 - Caching and incremental updates
+- Additional vector database integrations
 
 ## License
 

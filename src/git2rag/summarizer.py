@@ -24,7 +24,7 @@ def summarize_content(
     text_content: List[str],
     model: str = "openai/gpt-4o-mini",
     custom_prompt: Optional[str] = None,
-    max_tokens: int = 200,
+    max_tokens: int = 100,
     batch_size: int = 20,
 ) -> List[str]:
     """Summarize text content optimized for semantic embeddings.
