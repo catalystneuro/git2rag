@@ -1,0 +1,27 @@
+# Project Guidelines
+
+## General practices
+
+- before updating local files, always read them first to make sure you have its updated version in your context
+- avoid making any modifications that are not strictly necessary to the task you've been requested to do
+- if you spot any possible errors or have suggestions for improvement outside of the scope of your requested task, you can add them to your Task Completed message
+- always work within a virtual environment or conda environment
+
+## Critical Thinking practices
+
+- Always ask yourself: "are you sure this is the best way to implement this?"
+
+## Security practices
+
+- Never commit sensitive files
+- Use environment variables for secrets
+- Keep credentials out of logs and output
+
+## Code Practices
+
+- Always apply `black .` at the end of your tasks.
+- Lists of items should always have a comma at the end of the last item
+
+## Tools practices
+
+- Before and after any tool use, give me a confidence level (0-10) on how the tool use will help the project.

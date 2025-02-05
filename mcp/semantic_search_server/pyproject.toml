@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "semantic-search-mcp-server"
+version = "0.1.0"
+description = "Semantic Search MCP Server with query expansion and summarization"
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.poetry.dependencies]
+python = "3.11"
+mcp = "1.2.0"
+qdrant-client = "1.12.2"
+litellm = "1.59.8"
+instructor = "1.7.2"
+pydantic = "2.9.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
