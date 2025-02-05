@@ -17,14 +17,15 @@ This MCP server provides semantic search functionality specifically designed to 
 1. Make sure you have Python 3.11+ installed
 2. Install the required packages:
 ```bash
-pip install mcp
-pip install qdrant-client==1.12.2
-pip install litellm==1.59.8
-pip install instructor==1.7.2
-pip install pydantic==2.9.2
+pip install mcp uv
 ```
 
 ## Running the Server
+
+0. Export the required environment variables:
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+```
 
 1. Navigate to the project directory:
 ```bash
@@ -33,7 +34,12 @@ cd semantic_search_server
 
 2. Run the server:
 ```bash
-python src/main.py
+mcp dev src/main.py
+```
+
+or in editable mode:
+```bash
+mcp dev src/main.py --with-editable .
 ```
 
 ## Using the Server

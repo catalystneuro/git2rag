@@ -8,6 +8,20 @@ from config import config
 
 mcp = FastMCP("semantic-search-server", version="0.1.0")
 
+@mcp.tool()
+def return_string(query: str, context: str) -> str:
+    """
+    Return a string for testing.
+
+    Args:
+      query: The search query text.
+      context: The relevant context for the query.
+
+    Returns:
+      The string representation of the search result.
+    """
+    return f"Query: {query}, Context: {context}"
+
 
 @mcp.tool()
 def search_about_neuroconv(query: str, context: str) -> str:
@@ -35,12 +49,3 @@ def search_about_neuroconv(query: str, context: str) -> str:
         model=config.model,
     )
     return str(result)
-
-
-if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(mcp.run())
-    finally:
-        loop.close()

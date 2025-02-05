@@ -45,3 +45,5 @@ qdrant_storage/
 
 examples/*
 custom_tests/*
+
+uv.lock
