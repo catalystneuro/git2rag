@@ -1,7 +1,7 @@
 """Specialized chunking strategies for different types of repository content."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from enum import Enum, auto
 from pathlib import Path
 from typing import List, Optional, Literal
@@ -20,7 +20,6 @@ class ChunkingStrategy(Enum):
 @dataclass
 class Chunk:
     """A chunk of content with metadata."""
-
     source_file: str
     content_raw: str
     content_processed: Optional[str] = None
@@ -31,6 +30,9 @@ class Chunk:
     context: Optional[str] = None
     embedding_raw: Optional[List[float]] = None
     embedding_processed: Optional[List[float]] = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
 def _estimate_tokens(text: str) -> int:

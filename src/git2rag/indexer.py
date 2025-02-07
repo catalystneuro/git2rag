@@ -616,6 +616,37 @@ class RepoIndexer:
 
         return metrics
 
+    def get_chunks_by(
+        self,
+        repo_url: Optional[str] = None,
+        key: str = "source_file",
+        value: Optional[str] = None,
+    ) -> List[Chunk]:
+        if not repo_url:
+            # If repo URL is not provided, use the first repository
+            repo_url = next(iter(self.repositories.keys()))
+
+        repo_chunks = self.repositories[repo_url]["chunks"]
+        return [chunk for chunk in repo_chunks if chunk.to_dict()[key] == value]
+
+    def order_chunks_by(
+        self,
+        repo_url: Optional[str] = None,
+        key: str = "source_file",
+        reverse: bool = False,
+        update_self: bool = False,
+    ) -> List[Chunk]:
+        if not repo_url:
+            # If repo URL is not provided, use the first repository
+            repo_url = next(iter(self.repositories.keys()))
+
+        repo_chunks = self.repositories[repo_url]["chunks"]
+        sorted_chunks = sorted(repo_chunks, key=lambda x: x.to_dict()[key], reverse=reverse)
+        if update_self:
+            self.repositories[repo_url]["chunks"] = sorted_chunks
+        return sorted_chunks
+
+
     def search(
         self,
         query: str,
