@@ -1,5 +1,6 @@
 """Qdrant client operations for vector storage and retrieval."""
 
+import os
 from dataclasses import dataclass, asdict
 from typing import List, Optional, Dict, Any, Union, Tuple
 from pathlib import Path
@@ -29,7 +30,11 @@ class QdrantManager:
     """Manager for Qdrant operations."""
 
     def __init__(
-        self, url: str, api_key: Optional[str] = None, timeout: float = 60.0, batch_size: int = 100
+        self,
+        url: str,
+        api_key: Optional[str] = None,
+        timeout: float = 60.0,
+        batch_size: int = 100,
     ):
         """Initialize Qdrant manager.
 
@@ -39,7 +44,14 @@ class QdrantManager:
             timeout: Request timeout in seconds
             batch_size: Default batch size for operations
         """
-        self.client = QdrantClient(url=url, api_key=api_key, timeout=timeout)
+        if not api_key:
+            api_key = os.getenv("QDRANT_API_KEY", None)
+
+        self.client = QdrantClient(
+            url=url,
+            api_key=api_key,
+            timeout=timeout,
+        )
         self.batch_size = batch_size
 
     def create_collection(

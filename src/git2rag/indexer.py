@@ -49,10 +49,14 @@ class RepoIndexer:
         self.repositories: Dict[str, Dict[str, Any]] = {}
         self.qdrant_manager: Optional[QdrantManager] = None
 
-        # Check for API key in environment
+        # Check for API keys in environment
         llm_api_key = os.getenv("OPENAI_API_KEY", None)
         if not llm_api_key:
             self.logger.warning("OPENAI_API_KEY not set.")
+
+        qdrant_api_key = os.getenv("QDRANT_API_KEY", None)
+        if not qdrant_api_key:
+            self.logger.warning("QDRANT_API_KEY not set.")
 
     def parse_repo(
         self,
