@@ -104,7 +104,7 @@ class RepoIndexer:
         Returns:
             Estimated number of tokens
         """
-        return len(text.split()) * 3
+        return len(text.split()) * 1.5
 
     def _process_file_chunks(
         self,
@@ -281,6 +281,7 @@ class RepoIndexer:
         embedding_from: str = "both",  # "raw", "processed", or "both"
         embedding_model: str = "openai/text-embedding-ada-002",
         batch_size: int = 100,
+        max_tokens: int = 2000,
     ) -> None:
         """Generate embeddings for repository chunks.
 
@@ -303,14 +304,16 @@ class RepoIndexer:
             if embedding_from in ["raw", "both"]:
                 # Generate raw content embeddings
                 self.logger.info("Generating raw content embeddings")
-                texts = [chunk.content_raw for chunk in repo_chunks]
+                # Get only chunks smaller than max_tokens
+                valid_chunks = [chunk for chunk in repo_chunks if self._estimate_tokens(chunk.content_raw) < max_tokens]
+                texts = [chunk.content_raw for chunk in valid_chunks]
                 try:
                     embeddings = generate_embeddings(
                         texts=texts,
                         model=embedding_model,
                         batch_size=batch_size,
                     )
-                    for chunk, embedding in zip(repo_chunks, embeddings):
+                    for chunk, embedding in zip(valid_chunks, embeddings):
                         chunk.embedding_raw = embedding
                     self.logger.info("Successfully generated raw content embeddings")
                 except Exception as e:
@@ -331,14 +334,16 @@ class RepoIndexer:
                 self.logger.info(
                     f"Generating processed content embeddings for {len(chunks_with_processed)} chunks"
                 )
-                texts = [chunk.content_processed for chunk in chunks_with_processed]
+                # Get only chunks smaller than max_tokens
+                valid_chunks = [chunk for chunk in chunks_with_processed if self._estimate_tokens(chunk.content_processed) < max_tokens]
+                texts = [chunk.content_processed for chunk in valid_chunks]
                 try:
                     embeddings = generate_embeddings(
                         texts=texts,
                         model=embedding_model,
                         batch_size=batch_size,
                     )
-                    for chunk, embedding in zip(chunks_with_processed, embeddings):
+                    for chunk, embedding in zip(valid_chunks, embeddings):
                         chunk.embedding_processed = embedding
                     self.logger.info("Successfully generated processed content embeddings")
                 except Exception as e:
