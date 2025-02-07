@@ -28,13 +28,11 @@ class RepoIndexer:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
         log_level: int = logging.INFO,
     ):
         """Initialize the indexer.
 
         Args:
-            api_key: API key for the embedding provider
             log_level: Logging level (default: logging.INFO)
         """
         # Setup logger
@@ -52,11 +50,11 @@ class RepoIndexer:
 
         self.repositories: Dict[str, Dict[str, Any]] = {}
         self.qdrant_manager: Optional[QdrantManager] = None
-        if not api_key:
-            api_key = os.getenv("OPENAI_API_KEY", None)
-            self.api_key = api_key
-            if not api_key:
-                self.logger.warning("API key not provided and OPENAI_API_KEY not set.")
+
+        # Check for API key in environment
+        llm_api_key = os.getenv("OPENAI_API_KEY", None)
+        if not llm_api_key:
+            self.logger.warning("OPENAI_API_KEY not set.")
 
     def parse_repo(
         self,
@@ -109,15 +107,16 @@ class RepoIndexer:
     def _process_file_chunks(
         self,
         content: tuple,
-        strategy: Dict[str, List[ChunkingStrategy]],
+        strategies: Dict[str, List[ChunkingStrategy]],
         chunk_size: int,
         overlap: int,
+        llm_model: str = "openai/o3-mini",
     ) -> List[Chunk]:
         """Process a single file and generate chunks using specified strategies.
 
         Args:
             content: Tuple of (file_path, file_content)
-            strategy: Dictionary mapping file types to chunking strategies
+            strategies: Dictionary mapping file types to chunking strategies
             chunk_size: Target size of each chunk in characters
             overlap: Number of characters to overlap between chunks
 
@@ -128,7 +127,7 @@ class RepoIndexer:
         file_type = get_file_type(file_path=file_path)
         file_chunks = []
 
-        for st in strategy[file_type]:
+        for st in strategies[file_type]:
             self.logger.debug(f"Chunking file: {file_path} with strategy: {st.name}")
             chunks = chunk_file_content(
                 file_content=file_content,
@@ -136,6 +135,7 @@ class RepoIndexer:
                 strategy=st,
                 chunk_size=chunk_size,
                 overlap=overlap,
+                llm_model=llm_model,
             )
             file_chunks.extend(chunks)
 
@@ -144,19 +144,20 @@ class RepoIndexer:
     def generate_chunks(
         self,
         repo_url: Optional[str] = None,
-        strategy: Dict[str, List[ChunkingStrategy]] = None,
+        strategies: Dict[str, List[ChunkingStrategy]] = None,
         min_tokens: Optional[int] = None,
         max_tokens: Optional[int] = None,
         file_types: Optional[List[str]] = None,
         chunk_size: int = 400,
         overlap: int = 50,
         max_workers: int = 10,
+        llm_model: str = "openai/o3-mini",
     ) -> None:
         """Generate chunks from repository content using parallel processing.
 
         Args:
             repo_url: URL or path of the repository
-            strategy: dict
+            strategies: dict
             min_tokens: Minimum number of tokens per chunk
             max_tokens: Maximum number of tokens per chunk
             file_types: List of file extensions to include (e.g. ['.py', '.md'])
@@ -170,8 +171,8 @@ class RepoIndexer:
             # If repo URL is not provided, use the first repository
             repo_url = next(iter(self.repositories.keys()))
 
-        if not strategy:
-            strategy = {
+        if not strategies:
+            strategies = {
                 "code": [ChunkingStrategy.FILE, ChunkingStrategy.SEMANTIC],
                 "docs": [ChunkingStrategy.FILE, ChunkingStrategy.SEMANTIC],
             }
@@ -188,9 +189,10 @@ class RepoIndexer:
                     executor.submit(
                         self._process_file_chunks,
                         content,
-                        strategy,
+                        strategies,
                         chunk_size,
                         overlap,
+                        llm_model,
                     ): content[0]
                     for content in self.repositories[repo_url]["content"]
                 }
@@ -273,7 +275,7 @@ class RepoIndexer:
 
     def generate_embeddings(
         self,
-        repo_url: str,
+        repo_url: Optional[str] = None,
         embedding_from: str = "both",  # "raw", "processed", or "both"
         embedding_model: str = "openai/text-embedding-ada-002",
         batch_size: int = 100,
@@ -286,9 +288,14 @@ class RepoIndexer:
             embedding_model: Model to use for embeddings
             batch_size: Size of batches for processing embeddings (default: 100)
         """
+        if not repo_url:
+            # If repo URL is not provided, use the first repository
+            repo_url = next(iter(self.repositories.keys()))
+
         repo_chunks = self.repositories[repo_url]["chunks"]
         self.logger.info(f"Generating embeddings for {len(repo_chunks)} chunks")
         self.logger.debug(f"Using model: {embedding_model}, batch_size: {batch_size}")
+        self.embedding_model = embedding_model
 
         try:
             if embedding_from in ["raw", "both"]:
@@ -299,7 +306,6 @@ class RepoIndexer:
                     embeddings = generate_embeddings(
                         texts=texts,
                         model=embedding_model,
-                        api_key=self.api_key,
                         batch_size=batch_size,
                     )
                     for chunk, embedding in zip(repo_chunks, embeddings):
@@ -324,7 +330,6 @@ class RepoIndexer:
                     embeddings = generate_embeddings(
                         texts=texts,
                         model=embedding_model,
-                        api_key=self.api_key,
                         batch_size=batch_size,
                     )
                     for chunk, embedding in zip(chunks_with_processed, embeddings):
@@ -376,10 +381,10 @@ class RepoIndexer:
 
     def insert_chunks(
         self,
-        repo_url: str,
         qdrant_url: str,
         qdrant_collection_name: str,
         qdrant_api_key: Optional[str] = None,
+        repo_url: Optional[str] = None,
     ) -> None:
         """Insert chunks and their embeddings into the vector database.
 
@@ -389,6 +394,10 @@ class RepoIndexer:
             qdrant_collection_name: Name of the Qdrant collection
             qdrant_api_key: Optional API key for Qdrant server
         """
+        if not repo_url:
+            # If repo URL is not provided, use the first repository
+            repo_url = next(iter(self.repositories.keys()))
+
         try:
             self.intialize_qdrant(
                 qdrant_url=qdrant_url,
@@ -418,6 +427,7 @@ class RepoIndexer:
                                 "start_line": chunk.start_line,
                                 "end_line": chunk.end_line,
                                 "chunk_type": chunk.chunk_type,
+                                "chunk_strategy": chunk.chunk_strategy,
                                 "context": chunk.context,
                                 "repository": repo_url,
                                 "embedding_model": self.embedding_model,
@@ -438,7 +448,7 @@ class RepoIndexer:
     def index_repository(
         self,
         # Parsing parameters
-        repo_url: str,
+        repo_url: Optional[str] = None,
         include_patterns: Optional[List[str]] = None,
         exclude_patterns: Optional[List[str]] = None,
         # Chunking parameters
@@ -496,6 +506,10 @@ class RepoIndexer:
             "total_files": 0,
             "processed_files": 0
         }
+
+        if not repo_url:
+            # If repo URL is not provided, use the first repository
+            repo_url = next(iter(self.repositories.keys()))
 
         self.logger.info(f"Starting indexing for repository: {repo_url}")
         self.logger.debug(f"Configuration: strategy={strategy}, summarize={summarize}")
@@ -634,7 +648,6 @@ class RepoIndexer:
                 query_embedding = generate_embeddings(
                     texts=[query],
                     model=self.embedding_model,
-                    api_key=self.api_key,
                     batch_size=batch_size
                 )[0]
             except Exception as e:
