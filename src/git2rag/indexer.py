@@ -106,6 +106,41 @@ class RepoIndexer:
         """
         return len(text.split()) * 3
 
+    def _process_file_chunks(
+        self,
+        content: tuple,
+        strategy: Dict[str, List[ChunkingStrategy]],
+        chunk_size: int,
+        overlap: int,
+    ) -> List[Chunk]:
+        """Process a single file and generate chunks using specified strategies.
+
+        Args:
+            content: Tuple of (file_path, file_content)
+            strategy: Dictionary mapping file types to chunking strategies
+            chunk_size: Target size of each chunk in characters
+            overlap: Number of characters to overlap between chunks
+
+        Returns:
+            List of generated chunks
+        """
+        file_path, file_content = content
+        file_type = get_file_type(file_path=file_path)
+        file_chunks = []
+
+        for st in strategy[file_type]:
+            self.logger.debug(f"Chunking file: {file_path} with strategy: {st.name}")
+            chunks = chunk_file_content(
+                file_content=file_content,
+                file_path=file_path,
+                strategy=st,
+                chunk_size=chunk_size,
+                overlap=overlap,
+            )
+            file_chunks.extend(chunks)
+
+        return file_chunks
+
     def generate_chunks(
         self,
         repo_url: Optional[str] = None,
@@ -115,8 +150,9 @@ class RepoIndexer:
         file_types: Optional[List[str]] = None,
         chunk_size: int = 400,
         overlap: int = 50,
+        max_workers: int = 10,
     ) -> None:
-        """Generate chunks from repository content.
+        """Generate chunks from repository content using parallel processing.
 
         Args:
             repo_url: URL or path of the repository
@@ -126,7 +162,10 @@ class RepoIndexer:
             file_types: List of file extensions to include (e.g. ['.py', '.md'])
             chunk_size: Target size of each chunk in characters
             overlap: Number of characters to overlap between chunks
+            max_workers: Maximum number of worker threads (default: 4)
         """
+        import concurrent.futures
+
         if not repo_url:
             # If repo URL is not provided, use the first repository
             repo_url = next(iter(self.repositories.keys()))
@@ -138,26 +177,34 @@ class RepoIndexer:
             }
 
         n_files = len(self.repositories[repo_url]["content"])
-        self.logger.info(f"Generating chunks for {n_files} files.")
+        self.logger.info(f"Generating chunks for {n_files} files using {max_workers} workers.")
 
         all_chunks = []
         try:
-            # Iterate over all files in the repository
-            for content in self.repositories[repo_url]["content"]:
-                file_path = content[0]
-                file_content = content[1]
-                file_type = get_file_type(file_path=file_path)
-                # Iterate over chunking strategies for the file type
-                for st in strategy[file_type]:
-                    self.logger.debug(f"Chunking file: {file_path} with strategy: {st.name}")
-                    file_chunks = chunk_file_content(
-                        file_content=file_content,
-                        file_path=file_path,
-                        strategy=st,
-                        chunk_size=chunk_size,
-                        overlap=overlap,
-                    )
-                    all_chunks.extend(file_chunks)
+            # Process files in parallel using ThreadPoolExecutor
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Create tasks for each file
+                future_to_file = {
+                    executor.submit(
+                        self._process_file_chunks,
+                        content,
+                        strategy,
+                        chunk_size,
+                        overlap,
+                    ): content[0]
+                    for content in self.repositories[repo_url]["content"]
+                }
+
+                # Collect results as they complete
+                for future in concurrent.futures.as_completed(future_to_file):
+                    file_path = future_to_file[future]
+                    try:
+                        file_chunks = future.result()
+                        all_chunks.extend(file_chunks)
+                        self.logger.debug(f"Successfully processed file: {file_path}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to process file {file_path}: {str(e)}")
+                        raise
 
             # Apply filters
             self.logger.debug("Applying chunk filters")
