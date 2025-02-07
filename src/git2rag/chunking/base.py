@@ -20,6 +20,7 @@ class ChunkingStrategy(Enum):
 @dataclass
 class Chunk:
     """A chunk of content with metadata."""
+
     source_file: str
     content_raw: str
     content_processed: Optional[str] = None

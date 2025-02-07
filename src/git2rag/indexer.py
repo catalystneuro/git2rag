@@ -42,9 +42,7 @@ class RepoIndexer:
         # Add handler if none exists
         if not self.logger.handlers:
             handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
+            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
@@ -312,7 +310,9 @@ class RepoIndexer:
                         chunk.embedding_raw = embedding
                     self.logger.info("Successfully generated raw content embeddings")
                 except Exception as e:
-                    self.logger.error(f"Failed to generate raw content embeddings: {str(e)}", exc_info=True)
+                    self.logger.error(
+                        f"Failed to generate raw content embeddings: {str(e)}", exc_info=True
+                    )
                     raise
 
             if embedding_from in ["processed", "both"]:
@@ -324,7 +324,9 @@ class RepoIndexer:
                     self.logger.warning("No processed content found, skipping processed embeddings")
                     return
 
-                self.logger.info(f"Generating processed content embeddings for {len(chunks_with_processed)} chunks")
+                self.logger.info(
+                    f"Generating processed content embeddings for {len(chunks_with_processed)} chunks"
+                )
                 texts = [chunk.content_processed for chunk in chunks_with_processed]
                 try:
                     embeddings = generate_embeddings(
@@ -336,7 +338,9 @@ class RepoIndexer:
                         chunk.embedding_processed = embedding
                     self.logger.info("Successfully generated processed content embeddings")
                 except Exception as e:
-                    self.logger.error(f"Failed to generate processed content embeddings: {str(e)}", exc_info=True)
+                    self.logger.error(
+                        f"Failed to generate processed content embeddings: {str(e)}", exc_info=True
+                    )
                     raise
 
         except Exception as e:
@@ -399,6 +403,10 @@ class RepoIndexer:
             repo_url = next(iter(self.repositories.keys()))
 
         try:
+            # Order chunks by source file
+            self.order_chunks_by(repo_url, key="source_file", update_self=True)
+
+            # Initialize Qdrant manager if not already initialized
             self.intialize_qdrant(
                 qdrant_url=qdrant_url,
                 collection_name=qdrant_collection_name,
@@ -504,7 +512,7 @@ class RepoIndexer:
             "total_chunks": 0,
             "processed_chunks": 0,
             "total_files": 0,
-            "processed_files": 0
+            "processed_files": 0,
         }
 
         if not repo_url:
@@ -609,9 +617,9 @@ class RepoIndexer:
         self.logger.info(f"Total Duration: {metrics['duration']:.2f} seconds")
         self.logger.info(f"Files Processed: {metrics['total_files']}")
         self.logger.info(f"Chunks Generated: {metrics['total_chunks']}")
-        if metrics['errors']:
+        if metrics["errors"]:
             self.logger.warning("\nWarnings/Errors occurred during indexing:")
-            for error in metrics['errors']:
+            for error in metrics["errors"]:
                 self.logger.warning(f"- {error['step']}: {error['error']}")
 
         return metrics
@@ -646,7 +654,6 @@ class RepoIndexer:
             self.repositories[repo_url]["chunks"] = sorted_chunks
         return sorted_chunks
 
-
     def search(
         self,
         query: str,
@@ -679,7 +686,7 @@ class RepoIndexer:
                 query_embedding = generate_embeddings(
                     texts=[query],
                     model=self.embedding_model,
-                    batch_size=batch_size
+                    batch_size=batch_size,
                 )[0]
             except Exception as e:
                 self.logger.error(f"Failed to generate query embedding: {str(e)}", exc_info=True)
