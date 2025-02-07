@@ -22,7 +22,7 @@ Text to summarize:"""
 
 def summarize_content(
     text_content: List[str],
-    model: str = "openai/gpt-4o-mini",
+    model: str = "openai/o3-mini",
     custom_prompt: Optional[str] = None,
     max_tokens: int = 100,
     batch_size: int = 20,
@@ -31,7 +31,7 @@ def summarize_content(
 
     Args:
         text_content: List of texts to summarize
-        model: The model identifier (e.g., 'openai/gpt-4o', 'anthropic/claude-2')
+        model: The model identifier (e.g., 'openai/o3-mini', 'anthropic/claude-2')
         custom_prompt: Optional custom prompt to override the default
         max_tokens: Maximum tokens in the summary
         batch_size: Size of batches when processing multiple texts (default: 20)

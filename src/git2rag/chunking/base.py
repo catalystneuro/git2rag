@@ -89,13 +89,11 @@ class ChunkingConfig:
         strategy: Chunking strategy to use.
         chunk_size: Target size of each chunk in characters.
         overlap: Number of characters to overlap between chunks.
-        max_tokens: Maximum number of tokens per chunk.
     """
 
     strategy: ChunkingStrategy = ChunkingStrategy.FILE
     chunk_size: int = 400
     overlap: int = 50
-    max_tokens: int = 512
     llm_model: str = "openai/o3-mini"
 
 
@@ -406,7 +404,6 @@ def chunk_file_content(
     strategy: ChunkingStrategy = ChunkingStrategy.FILE,
     chunk_size: int = 400,
     overlap: int = 50,
-    max_tokens: int = 512,
     llm_model: str = "openai/o3-mini",
 ) -> List[Chunk]:
     """Process repository content and return chunks.
@@ -417,7 +414,6 @@ def chunk_file_content(
         strategy: Chunking strategy to use.
         chunk_size: Target size of each chunk in characters.
         overlap: Number of characters to overlap between chunks.
-        max_tokens: Maximum number of tokens per chunk.
 
     Returns:
         List of content chunks.
@@ -426,7 +422,6 @@ def chunk_file_content(
         strategy=strategy,
         chunk_size=chunk_size,
         overlap=overlap,
-        max_tokens=max_tokens,
         llm_model=llm_model,
     )
     chunker = get_chunker(filepath=file_path, config=config)

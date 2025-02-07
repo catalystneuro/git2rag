@@ -113,7 +113,7 @@ indexer.index_repository(
     repo_url="https://github.com/username/repo",
     strategy=ChunkingStrategy.SEMANTIC,
     summarize=True,
-    summary_model="openai/gpt-4o-mini",
+    summary_model="openai/o3-mini",
     embedding_from="both",  # Generate embeddings for both raw and processed content
 )
 
