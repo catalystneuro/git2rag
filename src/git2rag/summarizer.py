@@ -7,13 +7,14 @@ from litellm import completion, batch_completion
 # Default prompt optimized for semantic embeddings
 DEFAULT_SUMMARIZER_PROMPT = """Analyze and summarize the following text with a focus on semantic meaning and key concepts. Your summary must:
 
-1. Preserve the core concepts, technical terms, and domain-specific vocabulary
-2. Maintain important relationships between concepts
-3. Include key entities and their attributes
-4. Retain critical context that affects meaning
-5. Exclude redundant examples or repetitive phrasings
-6. Focus on factual content over stylistic elements
-7. Not exceed {max_tokens} tokens in length
+- Preserve the core concepts, technical terms, and domain-specific vocabulary
+- Maintain important relationships between concepts
+- Include key entities and their attributes
+- Retain critical context that affects meaning
+- Exclude redundant examples or repetitive phrasings
+- Exclude irrelevant details or tangential information
+- Focus on factual content over stylistic elements
+- Not exceed {max_tokens} tokens in length
 
 Aim for a concise summary that would enable accurate semantic embeddings while preserving the essential meaning and relationships in the text.
 
@@ -22,7 +23,7 @@ Text to summarize:"""
 
 def summarize_content(
     text_content: List[str],
-    model: str = "openai/gpt-4o-mini",
+    model: str = "openai/o3-mini",
     custom_prompt: Optional[str] = None,
     max_tokens: int = 100,
     batch_size: int = 20,
@@ -31,7 +32,7 @@ def summarize_content(
 
     Args:
         text_content: List of texts to summarize
-        model: The model identifier (e.g., 'openai/gpt-4o', 'anthropic/claude-2')
+        model: The model identifier (e.g., 'openai/o3-mini', 'anthropic/claude-2')
         custom_prompt: Optional custom prompt to override the default
         max_tokens: Maximum tokens in the summary
         batch_size: Size of batches when processing multiple texts (default: 20)

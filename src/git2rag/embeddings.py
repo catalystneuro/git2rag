@@ -8,7 +8,6 @@ from litellm import embedding
 def generate_embeddings(
     texts: List[str],
     model: str = "text-embedding-ada-002",
-    api_key: Optional[str] = None,
     batch_size: int = 100,
 ) -> List[List[float]]:
     """Generate embeddings for a list of texts using litellm.
@@ -16,7 +15,6 @@ def generate_embeddings(
     Args:
         texts: List of texts to generate embeddings for
         model: Model identifier (e.g., 'text-embedding-ada-002')
-        api_key: Optional API key. If not provided, uses environment variables
         batch_size: Number of texts to process in each API call (default: 100)
 
     Returns:
@@ -25,11 +23,6 @@ def generate_embeddings(
     Raises:
         Exception: If the API call fails
     """
-    # Set API key if provided
-    if api_key:
-        provider = model.split("/")[0] if "/" in model else "openai"
-        os.environ[f"{provider.upper()}_API_KEY"] = api_key
-
     embeddings = []
     # Process in batches
     total_texts = len(texts)

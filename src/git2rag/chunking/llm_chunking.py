@@ -107,8 +107,16 @@ def have_birthday(self) -> None: '''Increment the person's age by one year.'''",
 """
 
 PROMPT_DOC = """Given the following documentation text, determine the optimal segmentation to break the content into semantically coherent chunks
-suitable for semantic embeddings. Each chunk should capture a complete idea or section.
-Return a JSON object with a key 'chunks' that maps to a list of strings, each representing a chunk from the input content.
+suitable for semantic embeddings.
+- Keep the original content intact, do not modify the text.
+- Each chunk should capture a complete idea or section.
+- Chunks shouldn't be too long or too short, between 30 and 200 words.
+- Aim for a balance that captures the essence of the conten. But if you're in doubt, prefer longer chunks.
+- If you find code blocks or examples, try to keep them together with their explanations.
+- Do NOT break code snippets or examples into separate chunks.
+- Your response should contain chunks with only the original text, do not include additional comments or explanations.
+
+Return a JSON object with a key 'chunks' that maps to a list of strings, each representing a chunk from the original input content.
 """
 
 

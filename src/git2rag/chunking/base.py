@@ -1,10 +1,10 @@
 """Specialized chunking strategies for different types of repository content."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from enum import Enum, auto
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from .llm_chunking import llm_chunking
 
@@ -27,9 +27,13 @@ class Chunk:
     start_line: Optional[int] = None
     end_line: Optional[int] = None
     chunk_type: str = "text"
+    chunk_strategy: Optional[Literal["FILE", "MARKER", "SEMANTIC"]] = None
     context: Optional[str] = None
     embedding_raw: Optional[List[float]] = None
     embedding_processed: Optional[List[float]] = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
 def _estimate_tokens(text: str) -> int:
@@ -89,13 +93,11 @@ class ChunkingConfig:
         strategy: Chunking strategy to use.
         chunk_size: Target size of each chunk in characters.
         overlap: Number of characters to overlap between chunks.
-        max_tokens: Maximum number of tokens per chunk.
     """
 
     strategy: ChunkingStrategy = ChunkingStrategy.FILE
     chunk_size: int = 400
     overlap: int = 50
-    max_tokens: int = 512
     llm_model: str = "openai/o3-mini"
 
 
@@ -130,6 +132,7 @@ class BaseChunker:
                 start_line=0,
                 end_line=len(content.split("\n")),
                 chunk_type=self._get_chunk_type(filepath),
+                chunk_strategy="FILE",
             )
         ]
 
@@ -161,6 +164,7 @@ class BaseChunker:
                                 start_line=current_chunk_start,
                                 end_line=i,
                                 chunk_type=self._get_chunk_type(filepath),
+                                chunk_strategy="MARKER",
                             )
                         )
                         current_chunk_lines = remainder.split("\n")
@@ -174,6 +178,7 @@ class BaseChunker:
                             start_line=current_chunk_start,
                             end_line=i,
                             chunk_type=self._get_chunk_type(filepath),
+                            chunk_strategy="MARKER",
                         )
                     )
                     current_chunk_lines = [chunk_text[self.config.chunk_size :]]
@@ -187,6 +192,7 @@ class BaseChunker:
                     start_line=current_chunk_start,
                     end_line=len(lines),
                     chunk_type=self._get_chunk_type(filepath),
+                    chunk_strategy="MARKER",
                 )
             )
 
@@ -206,6 +212,7 @@ class BaseChunker:
                 content_raw=chunk_text,
                 source_file=filepath,
                 chunk_type=file_type,
+                chunk_strategy="SEMANTIC",
             )
             for chunk_text in text_chunks
         ]
@@ -244,6 +251,7 @@ class CodeChunker(BaseChunker):
                             start_line=current_chunk_start,
                             end_line=i,
                             chunk_type="code",
+                            chunk_strategy="MARKER",
                             context=current_context,
                         )
                     )
@@ -260,6 +268,7 @@ class CodeChunker(BaseChunker):
                             start_line=current_chunk_start,
                             end_line=i,
                             chunk_type="code",
+                            chunk_strategy="MARKER",
                             context=current_context,
                         )
                     )
@@ -299,6 +308,7 @@ class CodeChunker(BaseChunker):
                         start_line=current_chunk_start,
                         end_line=i + 1,
                         chunk_type="code",
+                        chunk_strategy="MARKER",
                         context=current_context,
                     )
                 )
@@ -313,6 +323,7 @@ class CodeChunker(BaseChunker):
                     start_line=current_chunk_start,
                     end_line=len(lines),
                     chunk_type="code",
+                    chunk_strategy="MARKER",
                     context=current_context,
                 )
             )
@@ -341,6 +352,7 @@ class DocumentationChunker(BaseChunker):
                             start_line=current_chunk_start,
                             end_line=i,
                             chunk_type="documentation",
+                            chunk_strategy="MARKER",
                             context=current_section,
                         )
                     )
@@ -367,6 +379,7 @@ class DocumentationChunker(BaseChunker):
                                 start_line=current_chunk_start,
                                 end_line=i,
                                 chunk_type="documentation",
+                                chunk_strategy="MARKER",
                                 context=current_section,
                             )
                         )
@@ -382,6 +395,7 @@ class DocumentationChunker(BaseChunker):
                     start_line=current_chunk_start,
                     end_line=len(lines),
                     chunk_type="documentation",
+                    chunk_strategy="MARKER",
                     context=current_section,
                 )
             )
@@ -406,7 +420,6 @@ def chunk_file_content(
     strategy: ChunkingStrategy = ChunkingStrategy.FILE,
     chunk_size: int = 400,
     overlap: int = 50,
-    max_tokens: int = 512,
     llm_model: str = "openai/o3-mini",
 ) -> List[Chunk]:
     """Process repository content and return chunks.
@@ -417,7 +430,6 @@ def chunk_file_content(
         strategy: Chunking strategy to use.
         chunk_size: Target size of each chunk in characters.
         overlap: Number of characters to overlap between chunks.
-        max_tokens: Maximum number of tokens per chunk.
 
     Returns:
         List of content chunks.
@@ -426,7 +438,6 @@ def chunk_file_content(
         strategy=strategy,
         chunk_size=chunk_size,
         overlap=overlap,
-        max_tokens=max_tokens,
         llm_model=llm_model,
     )
     chunker = get_chunker(filepath=file_path, config=config)
