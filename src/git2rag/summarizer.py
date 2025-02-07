@@ -7,13 +7,14 @@ from litellm import completion, batch_completion
 # Default prompt optimized for semantic embeddings
 DEFAULT_SUMMARIZER_PROMPT = """Analyze and summarize the following text with a focus on semantic meaning and key concepts. Your summary must:
 
-1. Preserve the core concepts, technical terms, and domain-specific vocabulary
-2. Maintain important relationships between concepts
-3. Include key entities and their attributes
-4. Retain critical context that affects meaning
-5. Exclude redundant examples or repetitive phrasings
-6. Focus on factual content over stylistic elements
-7. Not exceed {max_tokens} tokens in length
+- Preserve the core concepts, technical terms, and domain-specific vocabulary
+- Maintain important relationships between concepts
+- Include key entities and their attributes
+- Retain critical context that affects meaning
+- Exclude redundant examples or repetitive phrasings
+- Exclude irrelevant details or tangential information
+- Focus on factual content over stylistic elements
+- Not exceed {max_tokens} tokens in length
 
 Aim for a concise summary that would enable accurate semantic embeddings while preserving the essential meaning and relationships in the text.
 
