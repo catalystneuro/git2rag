@@ -25,11 +25,7 @@ class RepoIndexer:
 
     def __init__(
         self,
-        qdrant_url: str,
         api_key: Optional[str] = None,
-        qdrant_api_key: Optional[str] = None,
-        collection_name: str = "repo_content",
-        embedding_model: str = "text-embedding-ada-002",
     ):
         """Initialize the indexer.
 
@@ -38,28 +34,14 @@ class RepoIndexer:
             api_key: API key for the embedding provider
             qdrant_api_key: API key for Qdrant server
             collection_name: Name of the Qdrant collection
-            embedding_model: Model identifier for embeddings
         """
-        # Store repository metadata
         self.repositories: Dict[str, Dict[str, Any]] = {}
-
-        # Initialize Qdrant manager
-        self.qdrant = QdrantManager(
-            url=qdrant_url,
-            api_key=qdrant_api_key,
-            batch_size=100,  # Default batch size for Qdrant operations
-        )
-        self.collection_name = collection_name
-
-        # Store configuration
-        self.embedding_model = embedding_model
-        self.api_key = api_key
-
-        # Set vector size based on model (OpenAI models)
-        self.vector_size = 1536  # OpenAI models use 1536 dimensions
-
-        # Ensure collection exists
-        self.qdrant.create_collection(name=self.collection_name, vector_size=self.vector_size)
+        self.qdrant_manager: Optional[QdrantManager] = None
+        if not api_key:
+            api_key = os.getenv("OPENAI_API_KEY", None)
+            self.api_key = api_key
+            if not api_key:
+                raise Warning("API key not provided and OPENAI_API_KEY not set.")
 
     def parse_repo(
         self,
@@ -198,6 +180,7 @@ class RepoIndexer:
         self,
         repo_url: str,
         embedding_from: str = "both",  # "raw", "processed", or "both"
+        embedding_model: str = "openai/text-embedding-ada-002",
         batch_size: int = 100,
     ) -> None:
         """Generate embeddings for repository chunks.
@@ -215,7 +198,10 @@ class RepoIndexer:
             print("Generating raw content embeddings...")
             texts = [chunk.content_raw for chunk in repo_chunks]
             embeddings = generate_embeddings(
-                texts=texts, model=self.embedding_model, api_key=self.api_key, batch_size=batch_size
+                texts=texts,
+                model=embedding_model,
+                api_key=self.api_key,
+                batch_size=batch_size,
             )
             for chunk, embedding in zip(repo_chunks, embeddings):
                 chunk.embedding_raw = embedding
@@ -234,12 +220,52 @@ class RepoIndexer:
             )
             texts = [chunk.content_processed for chunk in chunks_with_processed]
             embeddings = generate_embeddings(
-                texts=texts, model=self.embedding_model, api_key=self.api_key, batch_size=batch_size
+                texts=texts,
+                model=embedding_model,
+                api_key=self.api_key,
+                batch_size=batch_size,
             )
             for chunk, embedding in zip(chunks_with_processed, embeddings):
                 chunk.embedding_processed = embedding
 
-    def insert_chunks(self, repo_url: str) -> None:
+    def intialize_qdrant(
+        self,
+        qdrant_url: str,
+        collection_name: str,
+        collection_vector_size: int = 1536,
+        qdrant_api_key: Optional[str] = None,
+        batch_size: int = 100,
+    ) -> None:
+        """Initialize the Qdrant manager and create a collection.
+
+        Args:
+            qdrant_url: URL of the Qdrant server
+            collection_name: Name of the Qdrant collection
+            collection_vector_size: Size of the vectors in the collection
+            qdrant_api_key: API key for the Qdrant server
+            batch_size: Batch size for Qdrant operations
+        """
+        if not self.qdrant_manager:
+            print("Initializing Qdrant manager...")
+            # Initialize Qdrant manager
+            self.qdrant_manager = QdrantManager(
+                url=qdrant_url,
+                api_key=qdrant_api_key,
+                batch_size=batch_size,
+            )
+            # Ensure collection exists
+            self.qdrant_manager.create_collection(
+                name=collection_name,
+                vector_size=collection_vector_size,
+            )
+
+    def insert_chunks(
+        self,
+        repo_url: str,
+        qdrant_url: str,
+        qdrant_collection_name: str,
+        qdrant_api_key: Optional[str] = None,
+    ) -> None:
         """Insert chunks and their embeddings into the vector database.
 
         Args:
@@ -247,6 +273,11 @@ class RepoIndexer:
             embeddings: List of embedding vectors
             repo_url: Repository URL for metadata
         """
+        self.intialize_qdrant(
+            qdrant_url=qdrant_url,
+            collection_name=qdrant_collection_name,
+            qdrant_api_key=qdrant_api_key,
+        )
         print("Storing vectors...")
         repo_chunks = self.repositories[repo_url]["chunks"]
         points = []
@@ -276,7 +307,10 @@ class RepoIndexer:
                     }
                 )
 
-        self.qdrant.insert_points(collection_name=self.collection_name, points=points)
+        self.qdrant_manager.insert_points(
+            collection_name=qdrant_collection_name,
+            points=points,
+        )
         print(f"Stored {len(points)} chunks successfully")
 
     def index_repository(
@@ -408,7 +442,7 @@ class RepoIndexer:
             filter_conditions["source_file"] = {"path": f".*\\.{file_extension}$"}
 
         # Search using manager
-        results = self.qdrant.search(
+        results = self.qdrant_manager.search(
             collection_name=self.collection_name,
             query_vector=query_embedding,
             vector_name=vector_name,
